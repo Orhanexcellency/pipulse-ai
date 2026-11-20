@@ -14,8 +14,26 @@ export default function Home() {
   const [newBot, setNewBot] = useState({ name: '', description: '', system_prompt: '', price: 0.01 });
 
   useEffect(() => {
+    loadPiSdk().catch(() => {});
     fetchAgents();
   }, []);
+
+  const loadPiSdk = () => {
+    return new Promise((resolve, reject) => {
+      if (typeof window !== 'undefined' && window.Pi) {
+        return resolve(window.Pi);
+      }
+      const script = document.createElement('script');
+      script.src = 'https://sdk.minepi.com/pi-sdk.js';
+      script.async = true;
+      script.onload = () => {
+        if (window.Pi) resolve(window.Pi);
+        else reject(new Error('Pi nesnesi bulunamadi'));
+      };
+      script.onerror = () => reject(new Error('Pi SDK indirilemedi'));
+      document.body.appendChild(script);
+    });
+  };
 
   const fetchAgents = async () => {
     const { data } = await supabase.from('ai_agents').select('*').order('created_at', { ascending: false });
@@ -24,18 +42,16 @@ export default function Home() {
 
   const handleLogin = async () => {
     try {
-      if (typeof window === 'undefined' || !window.Pi) {
-        return alert('Pi SDK yukleniyor, lutfen 2 saniye bekleyip tekrar deneyin.');
-      }
-      window.Pi.init({ version: '2.0', sandbox: false });
+      const Pi = await loadPiSdk();
+      Pi.init({ version: '2.0', sandbox: false });
       const scopes = ['username', 'payments'];
-      const auth = await window.Pi.authenticate(scopes, (payment) => {
+      const auth = await Pi.authenticate(scopes, (payment) => {
         console.log('Incomplete payment:', payment);
       });
       setUser(auth.user);
       await supabase.from('users').upsert({ pi_uid: auth.user.uid, username: auth.user.username }, { onConflict: 'pi_uid' });
     } catch (err) {
-      alert('Giris detayi: ' + (err?.message || JSON.stringify(err)));
+      alert('Giris hatasi: ' + (err?.message || JSON.stringify(err)));
     }
   };
 
@@ -48,7 +64,8 @@ export default function Home() {
     setLoading(true);
 
     try {
-      await window.Pi.createPayment(
+      const Pi = await loadPiSdk();
+      await Pi.createPayment(
         {
           amount: Number(selectedAgent.price_per_msg),
           memo: `${selectedAgent.name} AI Sorusu (x402)`,
