@@ -14,9 +14,6 @@ export default function Home() {
   const [newBot, setNewBot] = useState({ name: '', description: '', system_prompt: '', price: 0.01 });
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.Pi) {
-      window.Pi.init({ version: '2.0', sandbox: false });
-    }
     fetchAgents();
   }, []);
 
@@ -27,6 +24,10 @@ export default function Home() {
 
   const handleLogin = async () => {
     try {
+      if (typeof window === 'undefined' || !window.Pi) {
+        return alert('Pi SDK yukleniyor, lutfen 2 saniye bekleyip tekrar deneyin.');
+      }
+      window.Pi.init({ version: '2.0', sandbox: false });
       const scopes = ['username', 'payments'];
       const auth = await window.Pi.authenticate(scopes, (payment) => {
         console.log('Incomplete payment:', payment);
@@ -34,7 +35,7 @@ export default function Home() {
       setUser(auth.user);
       await supabase.from('users').upsert({ pi_uid: auth.user.uid, username: auth.user.username }, { onConflict: 'pi_uid' });
     } catch (err) {
-      alert('Giris hatasi: Lutfen Pi Browser icinden acin.');
+      alert('Giris detayi: ' + (err?.message || JSON.stringify(err)));
     }
   };
 
@@ -68,12 +69,15 @@ export default function Home() {
             setLoading(false);
           },
           onCancel: () => setLoading(false),
-          onError: () => setLoading(false),
+          onError: (err) => {
+            setLoading(false);
+            alert('Odeme hatasi: ' + (err?.message || 'Bilinmeyen hata'));
+          },
         }
       );
     } catch (e) {
       setLoading(false);
-      alert('Odeme baslatilamadi.');
+      alert('Odeme baslatilamadi: ' + (e?.message || 'Hata'));
     }
   };
 
@@ -167,5 +171,4 @@ export default function Home() {
       )}
     </div>
   );
-          }
-                       
+}
