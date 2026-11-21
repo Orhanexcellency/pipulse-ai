@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 
-const GEMINI_KEY = 'AQ.Ab8RN6J5e5948lIP5AFRfUxA34mQsQuBG8W9H8lT_msHyV4r5w';
+const GEMINI_KEY = 'AQ.Ab8RN6I5-xkIDsAr2H5tKl6OhuCfbPHTSdtxIzapSUUn_TTLkA';
 
 const BOTS = [
   { id: '1', creator_username: 'PiPulse', name: 'Pi Uzmani', description: 'Pi Network ve hackathon asistani.', system_prompt: 'Sen Pi uzmanisin.', price_per_msg: 0.01 },
