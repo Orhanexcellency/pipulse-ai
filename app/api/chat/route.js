@@ -20,7 +20,8 @@ export async function POST(req) {
     });
 
     const data = await res.json();
-    const reply = data.choices?.[0]?.message?.content || '⚡ Yanit olusturuldu.';
+    const firstChoice = Array.isArray(data.choices) ? data.choices.at(0) : null;
+    const reply = firstChoice?.message?.content || '⚡ Yanit olusturuldu.';
     return NextResponse.json({ success: true, reply });
   } catch (error) {
     return NextResponse.json({ success: true, reply: '⚡ Baglanti yogun, lutfen tekrar deneyin.' });
