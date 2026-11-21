@@ -4,31 +4,33 @@ import axios from 'axios';
 export async function POST(req) {
   try {
     const { message, systemPrompt } = await req.json();
-    const apiKey = (process.env.GROQ_API_KEY || '').trim();
-    
+    const apiKey = (process.env.GEMINI_API_KEY || '').trim();
+
     const { data } = await axios.post(
-      'https://groq.com',
+      `https://googleapis.com{apiKey}`,
       {
-        model: 'llama-3.1-8b-instant',
-        messages: [
-          { role: 'system', content: systemPrompt || 'Sen Pi Network konusunda uzman bir yapay zeka asistanisin. Kullanicinin dilinde kisa ve net cevap ver.' },
-          { role: 'user', content: message },
+        contents: [
+          {
+            parts: [
+              {
+                text: `Rolun: ${systemPrompt || 'Sen Pi Network konusunda uzman bir yapay zeka asistanisin. Kullanicinin dilinde kisa ve net cevap ver.'}\n\nSoru: ${message}`,
+              },
+            ],
+          },
         ],
-        max_tokens: 400,
       },
       {
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        timeout: 8000,
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 9000,
       }
     );
 
-    const reply = data?.choices?.at(0)?.message?.content || '⚡ Yanit olusturuldu.';
+    const candidate = Array.isArray(data?.candidates) ? data.candidates.at(0) : null;
+    const part = Array.isArray(candidate?.content?.parts) ? candidate.content.parts.at(0) : null;
+    const reply = part?.text || '⚡ Yanit olusturuldu.';
     return NextResponse.json({ success: true, reply });
   } catch (e) {
     const errMsg = e.response?.data?.error?.message || e.message;
-    return NextResponse.json({ success: true, reply: '⚠️ Bilgi: ' + errMsg });
+    return NextResponse.json({ success: true, reply: '⚠️ Detay: ' + errMsg });
   }
 }
