@@ -28,10 +28,11 @@ export async function POST(req) {
       return NextResponse.json({ success: true, reply: '⚠️ Gemini Hatasi: ' + (data.error?.message || res.status) });
     }
 
-    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || '⚡ Yanit olusturuldu.';
+    const candidate = Array.isArray(data.candidates) ? data.candidates.at(0) : null;
+    const part = Array.isArray(candidate?.content?.parts) ? candidate.content.parts.at(0) : null;
+    const reply = part?.text || '⚡ Yanit olusturuldu.';
     return NextResponse.json({ success: true, reply });
   } catch (error) {
-    const detail = error.cause ? ` (${error.cause.code || error.cause.message})` : '';
-    return NextResponse.json({ success: true, reply: '⚠️ Hata: ' + error.message + detail });
+    return NextResponse.json({ success: true, reply: '⚠️ Hata: ' + error.message });
   }
 }
