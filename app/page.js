@@ -3,216 +3,122 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import axios from 'axios';
 
-const DEMO_BOTS = [
-  {
-    id: 'demo-1',
-    creator_username: 'PiPulseOfficial',
-    name: 'Pi Ekosistem Uzmani',
-    description: 'Pi Network projeleri, hackathon ve DeFi konularinda uzman asistan.',
-    system_prompt: 'Sen Pi Network ekosisteminde uzman bir yapay zeka asistanisin.',
-    price_per_msg: 0.01,
-  },
-  {
-    id: 'demo-2',
-    creator_username: 'PiPulseOfficial',
-    name: 'Ingilizce Pratik Kocu',
-    description: 'Seninle her seviyede Ingilizce sohbet eden ve hatalarini duzelten ogretmen.',
-    system_prompt: 'Sen sabirli bir Ingilizce ogretmenisin.',
-    price_per_msg: 0.01,
-  },
+const BOTS = [
+  { id: '1', creator_username: 'PiPulse', name: 'Pi Uzmani', description: 'Pi Network ve hackathon asistani.', system_prompt: 'Sen Pi uzmanisin.', price_per_msg: 0.01 },
+  { id: '2', creator_username: 'PiPulse', name: 'Ingilizce Kocu', description: 'Ingilizce pratik ogretmeni.', system_prompt: 'Sen Ingilizce ogretmenisin.', price_per_msg: 0.01 }
 ];
 
 export default function Home() {
   const [user, setUser] = useState(null);
-  const [agents, setAgents] = useState(DEMO_BOTS);
-  const [selectedAgent, setSelectedAgent] = useState(null);
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [showCreate, setShowCreate] = useState(false);
-  const [newBot, setNewBot] = useState({ name: '', description: '', system_prompt: '', price: 0.01 });
+  const [agents, setAgents] = useState(BOTS);
+  const [bot, setBot] = useState(null);
+  const [msgs, setMsgs] = useState([]);
+  const [txt, setTxt] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [tab, setTab] = useState('market');
+  const [form, setForm] = useState({ name: '', description: '', system_prompt: '', price: 0.01 });
 
-  useEffect(() => {
-    loadPiSdk().catch(() => {});
-    fetchAgents();
-  }, []);
+  useEffect(() => { loadPi().catch(()=>{}); getBots(); }, []);
 
-  const loadPiSdk = () => {
-    return new Promise((resolve, reject) => {
-      if (typeof window !== 'undefined' && window.Pi) {
-        return resolve(window.Pi);
-      }
-      const script = document.createElement('script');
-      script.src = 'https://minepi.com';
-      script.async = true;
-      script.onload = () => {
-        if (window.Pi) resolve(window.Pi);
-        else reject(new Error('Pi nesnesi bulunamadi'));
-      };
-      script.onerror = () => reject(new Error('Pi SDK indirilemedi'));
-      document.body.appendChild(script);
-    });
+  const loadPi = () => new Promise((res, rej) => {
+    if (window.Pi) return res(window.Pi);
+    const s = document.createElement('script');
+    s.src = 'https://minepi.com';
+    s.onload = () => window.Pi ? res(window.Pi) : rej('SDK yok');
+    s.onerror = () => rej('Yuklenemedi');
+    document.body.appendChild(s);
+  });
+
+  const getBots = async () => {
+    const { data } = await supabase.from('ai_agents').select('*').order('created_at', { ascending: false });
+    if (data?.length) setAgents(data);
   };
 
-  const fetchAgents = async () => {
+  const login = async () => {
     try {
-      const { data, error } = await supabase.from('ai_agents').select('*').order('created_at', { ascending: false });
-      if (error) {
-        console.log('DB okuma hatasi:', error.message);
-        return;
-      }
-      if (data && data.length > 0) {
-        setAgents(data);
-      }
-    } catch (err) {
-      console.log('Baglanti hatasi:', err);
-    }
-  };
-
-  const handleLogin = async () => {
-    try {
-      const Pi = await loadPiSdk();
+      const Pi = await loadPi();
       Pi.init({ version: '2.0', sandbox: false });
-      const scopes = ['username', 'payments'];
-      const auth = await Pi.authenticate(scopes, (payment) => {
-        console.log('Incomplete payment:', payment);
-      });
+      const auth = await Pi.authenticate(['username', 'payments'], () => {});
       setUser(auth.user);
       await supabase.from('users').upsert({ pi_uid: auth.user.uid, username: auth.user.username }, { onConflict: 'pi_uid' });
-    } catch (err) {
-      alert('Giris hatasi: ' + (err?.message || JSON.stringify(err)));
-    }
+    } catch (e) { alert('Giris: ' + (e?.message || e)); }
   };
 
-  const handleSendMessage = async () => {
-    if (!input.trim() || !selectedAgent) return;
-    if (!user) return alert('Once Pi cuzdaninizla giris yapin!');
-
-    const userMsg = input;
-    setInput('');
-    setLoading(true);
-
+  const send = async () => {
+    if (!txt.trim() || !bot) return;
+    if (!user) return alert('Once Pi ile giris yapin!');
+    const q = txt; setTxt(''); setBusy(true);
     try {
-      const Pi = await loadPiSdk();
-      await Pi.createPayment(
-        {
-          amount: Number(selectedAgent.price_per_msg),
-          memo: `${selectedAgent.name} AI Sorusu (x402)`,
-          metadata: { agentId: selectedAgent.id, uid: user.uid },
+      const Pi = await loadPi();
+      await Pi.createPayment({ amount: Number(bot.price_per_msg), memo: bot.name, metadata: { id: bot.id } }, {
+        onReadyForServerApproval: (paymentId) => axios.post('/api/payments/approve', { paymentId }),
+        onReadyForServerCompletion: async (paymentId, txid) => {
+          await axios.post('/api/payments/complete', { paymentId, txid });
+          const r = await axios.post('/api/chat', { message: q, systemPrompt: bot.system_prompt });
+          setMsgs(p => [...p, { r: 'u', t: q }, { r: 'a', t: r.data.reply }]);
+          setBusy(false);
         },
-        {
-          onReadyForServerApproval: async (paymentId) => {
-            await axios.post('/api/payments/approve', { paymentId });
-          },
-          onReadyForServerCompletion: async (paymentId, txid) => {
-            await axios.post('/api/payments/complete', { paymentId, txid });
-            setMessages((prev) => [...prev, { role: 'user', text: userMsg }]);
-            const res = await axios.post('/api/chat', {
-              message: userMsg,
-              systemPrompt: selectedAgent.system_prompt,
-            });
-            setMessages((prev) => [...prev, { role: 'ai', text: res.data.reply }]);
-            setLoading(false);
-          },
-          onCancel: () => setLoading(false),
-          onError: (err) => {
-            setLoading(false);
-            alert('Odeme hatasi: ' + (err?.message || 'Bilinmeyen hata'));
-          },
-        }
-      );
-    } catch (e) {
-      setLoading(false);
-      alert('Odeme baslatilamadi: ' + (e?.message || 'Hata'));
-    }
+        onCancel: () => setBusy(false),
+        onError: (e) => { setBusy(false); alert('Odeme hatasi: ' + e?.message); }
+      });
+    } catch (e) { setBusy(false); alert('Hata: ' + e?.message); }
   };
 
-  const handleCreateBot = async (e) => {
+  const create = async (e) => {
     e.preventDefault();
-    if (!user) return alert('Bot olusturmak icin once Pi ile giris yapin!');
-    setSaving(true);
-    try {
-      const { error } = await supabase.from('ai_agents').insert({
-        creator_uid: user.uid,
-        creator_username: user.username,
-        name: newBot.name,
-        description: newBot.description,
-        system_prompt: newBot.system_prompt,
-        price_per_msg: Number(newBot.price),
-      });
-
-      if (error) {
-        alert('Veritabani Kayit Hatasi: ' + error.message);
-        setSaving(false);
-        return;
-      }
-
-      alert('Tebrikler! Botunuz basariyla yayinlandi.');
-      setNewBot({ name: '', description: '', system_prompt: '', price: 0.01 });
-      setShowCreate(false);
-      await fetchAgents();
-    } catch (err) {
-      alert('Beklenmeyen Hata: ' + (err?.message || 'Baglanti kurulamadi'));
-    }
-    setSaving(false);
+    if (!user) return alert('Once Pi ile giris yapin!');
+    setBusy(true);
+    const { error } = await supabase.from('ai_agents').insert({
+      creator_uid: user.uid, creator_username: user.username,
+      name: form.name, description: form.description, system_prompt: form.system_prompt, price_per_msg: Number(form.price)
+    });
+    setBusy(false);
+    if (error) return alert('DB Hatasi: ' + error.message);
+    alert('Bot yayinlandi!');
+    setForm({ name: '', description: '', system_prompt: '', price: 0.01 });
+    setTab('market');
+    getBots();
   };
 
   return (
-    <div style={{ maxWidth: '480px', margin: '0 auto', padding: '16px' }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #333', paddingBottom: '12px' }}>
-        <h1 style={{ fontSize: '20px', color: '#f5b041', margin: 0 }}>⚡ PiPulse AI</h1>
-        {user ? (
-          <span style={{ background: '#2e1a47', padding: '6px 12px', borderRadius: '20px', fontSize: '13px' }}>@{user.username}</span>
-        ) : (
-          <button onClick={handleLogin} style={{ background: '#f5b041', color: '#000', border: 'none', padding: '8px 14px', borderRadius: '8px', fontWeight: 'bold' }}>
-            Pi ile Giris
-          </button>
-        )}
-      </header>
-
-      <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
-        <button onClick={() => { setSelectedAgent(null); setShowCreate(false); fetchAgents(); }} style={{ flex: 1, padding: '10px', background: !showCreate ? '#3c2a63' : '#1e1633', color: '#fff', border: '1px solid #4a3578', borderRadius: '8px', fontWeight: 'bold' }}>
-          🤖 Bot Pazari
-        </button>
-        <button onClick={() => { setSelectedAgent(null); setShowCreate(true); }} style={{ flex: 1, padding: '10px', background: showCreate ? '#7d3c98' : '#5b2c6f', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold' }}>
-          + Kendi Botunu Yap
-        </button>
+    <div style={{ maxWidth: 480, margin: '0 auto', padding: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #333', paddingBottom: 10 }}>
+        <b style={{ color: '#f5b041', fontSize: 18 }}>⚡ PiPulse AI</b>
+        {user ? <span>@{user.username}</span> : <button onClick={login} style={{ background: '#f5b041', padding: '6px 12px', borderRadius: 8, border: 'none', fontWeight: 'bold' }}>Pi ile Giris</button>}
       </div>
-
-      {showCreate && (
-        <form onSubmit={handleCreateBot} style={{ background: '#1a142e', padding: '16px', borderRadius: '12px', marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <h3 style={{ margin: 0, color: '#f5b041' }}>Yeni AI Botu Olustur & Pi Kazan</h3>
-          <input placeholder="Bot Adi (Orn: Kripto Analist)" value={newBot.name} onChange={(e) => setNewBot({ ...newBot, name: e.target.value })} required style={{ padding: '10px', borderRadius: '6px', border: 'none' }} />
-          <input placeholder="Kisa Aciklama" value={newBot.description} onChange={(e) => setNewBot({ ...newBot, description: e.target.value })} required style={{ padding: '10px', borderRadius: '6px', border: 'none' }} />
-          <textarea placeholder="Yapay Zeka Talimati (System Prompt)" value={newBot.system_prompt} onChange={(e) => setNewBot({ ...newBot, system_prompt: e.target.value })} required style={{ padding: '10px', borderRadius: '6px', border: 'none', minHeight: '70px' }} />
-          <input type="number" step="0.01" placeholder="Soru Basi Ucret (Pi)" value={newBot.price} onChange={(e) => setNewBot({ ...newBot, price: e.target.value })} required style={{ padding: '10px', borderRadius: '6px', border: 'none' }} />
-          <button type="submit" disabled={saving} style={{ background: '#f5b041', color: '#000', padding: '12px', borderRadius: '8px', fontWeight: 'bold', border: 'none' }}>
-            {saving ? 'Kaydediliyor...' : 'Yayinla'}
-          </button>
+      <div style={{ display: 'flex', gap: 8, margin: '12px 0' }}>
+        <button onClick={() => { setBot(null); setTab('market'); getBots(); }} style={{ flex: 1, padding: 10, background: '#2e1a47', color: '#fff', border: 'none', borderRadius: 8 }}>🤖 Bot Pazari</button>
+        <button onClick={() => { setBot(null); setTab('create'); }} style={{ flex: 1, padding: 10, background: '#5b2c6f', color: '#fff', border: 'none', borderRadius: 8 }}>+ Bot Olustur</button>
+      </div>
+      {tab === 'create' && (
+        <form onSubmit={create} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <input placeholder="Bot Adi" value={form.name} onChange={e => setForm({...form, name: e.target.value})} required style={{ padding: 10, borderRadius: 6 }} />
+          <input placeholder="Aciklama" value={form.description} onChange={e => setForm({...form, description: e.target.value})} required style={{ padding: 10, borderRadius: 6 }} />
+          <textarea placeholder="Talimat (Prompt)" value={form.system_prompt} onChange={e => setForm({...form, system_prompt: e.target.value})} required style={{ padding: 10, borderRadius: 6 }} />
+          <input type="number" step="0.01" value={form.price} onChange={e => setForm({...form, price: e.target.value})} required style={{ padding: 10, borderRadius: 6 }} />
+          <button type="submit" disabled={busy} style={{ background: '#f5b041', padding: 12, borderRadius: 8, fontWeight: 'bold', border: 'none' }}>{busy ? 'Kaydediliyor...' : 'Yayinla'}</button>
         </form>
       )}
-
-      {!selectedAgent && !showCreate && (
-        <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {agents.map((bot) => (
-            <div key={bot.id} onClick={() => { setSelectedAgent(bot); setMessages([]); }} style={{ background: '#1a142e', padding: '14px', borderRadius: '12px', border: '1px solid #3c2a63', cursor: 'pointer' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <strong style={{ color: '#f5b041' }}>{bot.name}</strong>
-                <span style={{ background: '#2e1a47', padding: '2px 8px', borderRadius: '12px', fontSize: '12px' }}>{bot.price_per_msg} Pi / Soru</span>
-              </div>
-              <p style={{ fontSize: '13px', color: '#ccc', margin: '8px 0' }}>{bot.description}</p>
-              <small style={{ color: '#888' }}>Uretici: @{bot.creator_username}</small>
-            </div>
-          ))}
+      {tab === 'market' && !bot && agents.map(b => (
+        <div key={b.id} onClick={() => { setBot(b); setMsgs([]); }} style={{ background: '#1a142e', padding: 12, borderRadius: 10, marginBottom: 10, border: '1px solid #4a3578' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}><b style={{ color: '#f5b041' }}>{b.name}</b><span>{b.price_per_msg} Pi</span></div>
+          <p style={{ fontSize: 13, margin: '6px 0' }}>{b.description}</p>
+          <small style={{ color: '#999' }}>@{b.creator_username}</small>
+        </div>
+      ))}
+      {bot && (
+        <div style={{ background: '#1a142e', padding: 12, borderRadius: 10 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}><b>{bot.name}</b><button onClick={() => setBot(null)} style={{ color: '#f5b041', background: 'none', border: 'none' }}>← Geri</button></div>
+          <div style={{ height: 220, overflowY: 'auto', background: '#0f0c29', padding: 8, borderRadius: 8, marginBottom: 8 }}>
+            {msgs.map((m, i) => <div key={i} style={{ textAlign: m.r === 'u' ? 'right' : 'left', margin: '4px 0' }}><span style={{ background: m.r === 'u' ? '#5b2c6f' : '#261e45', padding: '6px 10px', borderRadius: 8, display: 'inline-block' }}>{m.t}</span></div>)}
+            {busy && <small style={{ color: '#f5b041' }}>Islem yapiliyor...</small>}
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <input value={txt} onChange={e => setTxt(e.target.value)} placeholder="Sorunu yaz..." style={{ flex: 1, padding: 8, borderRadius: 6 }} />
+            <button onClick={send} disabled={busy} style={{ background: '#f5b041', padding: '8px 14px', borderRadius: 6, fontWeight: 'bold', border: 'none' }}>Gonder</button>
+          </div>
         </div>
       )}
-
-      {selectedAgent && !showCreate && (
-        <div style={{ marginTop: '16px', background: '#1a142e', padding: '14px', borderRadius: '12px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <strong>{selectedAgent.name} ({selectedAgent.price_per_msg} Pi)</strong>
-            <button onClick={() => setSelectedAgent(null)} style={{ background: 'transparent', color: '#f5b041', border: 'none' }}>← Geri</button>
-          </div>
-          <div style={{ height: '260px', overflowY: 'auto', background: '#0f0c29', padding: '10px', borderRadius: '8px', marginBottom: '10px' }}>
-            {messages.map((m, idx) => (
+    </div>
+  );
+}
