@@ -18,16 +18,10 @@ export default function Home() {
   const [tab, setTab] = useState('market');
   const [form, setForm] = useState({ name: '', description: '', system_prompt: '', price: 0.01 });
 
-  useEffect(() => { loadPi().catch(()=>{}); getBots(); }, []);
-
-  const loadPi = () => new Promise((res, rej) => {
-    if (window.Pi) return res(window.Pi);
-    const s = document.createElement('script');
-    s.src = 'https://minepi.com';
-    s.onload = () => window.Pi ? res(window.Pi) : rej('SDK yok');
-    s.onerror = () => rej('Yuklenemedi');
-    document.body.appendChild(s);
-  });
+  useEffect(() => {
+    if (window.Pi) { try { window.Pi.init({ version: '2.0', sandbox: false }); } catch (e) {} }
+    getBots();
+  }, []);
 
   const getBots = async () => {
     const { data } = await supabase.from('ai_agents').select('*').order('created_at', { ascending: false });
@@ -36,12 +30,14 @@ export default function Home() {
 
   const login = async () => {
     try {
-      const Pi = await loadPi();
-      Pi.init({ version: '2.0', sandbox: false });
-      const auth = await Pi.authenticate(['username', 'payments'], () => {});
+      if (!window.Pi) return alert('Sayfayi yenileyip tekrar deneyin.');
+      window.Pi.init({ version: '2.0', sandbox: false });
+      const auth = await window.Pi.authenticate(['username', 'payments'], () => {});
       setUser(auth.user);
-      await supabase.from('users').upsert({ pi_uid: auth.user.uid, username: auth.user.username }, { onConflict: 'pi_uid' });
-    } catch (e) { alert('Giris: ' + (e?.message || e)); }
+      supabase.from('users').upsert({ pi_uid: auth.user.uid, username: auth.user.username }, { onConflict: 'pi_uid' });
+    } catch (e) {
+      alert('Giris Hatasi: ' + (e?.message || JSON.stringify(e)));
+    }
   };
 
   const send = async () => {
@@ -49,8 +45,7 @@ export default function Home() {
     if (!user) return alert('Once Pi ile giris yapin!');
     const q = txt; setTxt(''); setBusy(true);
     try {
-      const Pi = await loadPi();
-      await Pi.createPayment({ amount: Number(bot.price_per_msg), memo: bot.name, metadata: { id: bot.id } }, {
+      await window.Pi.createPayment({ amount: Number(bot.price_per_msg), memo: bot.name, metadata: { id: bot.id } }, {
         onReadyForServerApproval: (paymentId) => axios.post('/api/payments/approve', { paymentId }),
         onReadyForServerCompletion: async (paymentId, txid) => {
           await axios.post('/api/payments/complete', { paymentId, txid });
@@ -83,12 +78,12 @@ export default function Home() {
   return (
     <div style={{ maxWidth: 480, margin: '0 auto', padding: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #333', paddingBottom: 10 }}>
-        <b style={{ color: '#f5b041', fontSize: 18 }}>⚡ PiPulse AI</b>
-        {user ? <span>@{user.username}</span> : <button onClick={login} style={{ background: '#f5b041', padding: '6px 12px', borderRadius: 8, border: 'none', fontWeight: 'bold' }}>Pi ile Giris</button>}
+        <b onClick={() => { setBot(null); setTab('market'); }} style={{ color: '#f5b041', fontSize: 18, cursor: 'pointer' }}>⚡ PiPulse AI</b>
+        {user ? <span>@{user.username}</span> : <button onClick={login} style={{ background: '#f5b041', padding: '8px 14px', borderRadius: 8, border: 'none', fontWeight: 'bold' }}>Pi ile Giris</button>}
       </div>
       <div style={{ display: 'flex', gap: 8, margin: '12px 0' }}>
-        <button onClick={() => { setBot(null); setTab('market'); getBots(); }} style={{ flex: 1, padding: 10, background: '#2e1a47', color: '#fff', border: 'none', borderRadius: 8 }}>🤖 Bot Pazari</button>
-        <button onClick={() => { setBot(null); setTab('create'); }} style={{ flex: 1, padding: 10, background: '#5b2c6f', color: '#fff', border: 'none', borderRadius: 8 }}>+ Bot Olustur</button>
+        <button onClick={() => { setBot(null); setTab('market'); }} style={{ flex: 1, padding: 10, background: tab === 'market' ? '#4a3578' : '#1e1633', color: '#fff', border: 'none', borderRadius: 8 }}>🤖 Bot Pazari</button>
+        <button onClick={() => { setBot(null); setTab('create'); }} style={{ flex: 1, padding: 10, background: tab === 'create' ? '#7d3c98' : '#1e1633', color: '#fff', border: 'none', borderRadius: 8 }}>+ Bot Olustur</button>
       </div>
       {tab === 'create' && (
         <form onSubmit={create} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
