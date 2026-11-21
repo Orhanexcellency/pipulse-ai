@@ -1,7 +1,8 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import axios from 'axios';
+
+const GEMINI_KEY = 'AQ.Ab8RN6J5e5948lIP5AFRfUxA34mQsQuBG8W9H8lT_msHyV4r5w';
 
 const BOTS = [
   { id: '1', creator_username: 'PiPulse', name: 'Pi Uzmani', description: 'Pi Network ve hackathon asistani.', system_prompt: 'Sen Pi uzmanisin.', price_per_msg: 0.01 },
@@ -25,24 +26,8 @@ export default function Home() {
     if (data?.length) setAgents(data);
   };
 
-  const login = async () => {
-    setBusy(true);
-    try {
-      if (typeof window !== 'undefined' && window.Pi) {
-        window.Pi.init({ version: '2.0', sandbox: false });
-        const auth = await Promise.race([
-          window.Pi.authenticate(['username', 'payments'], () => {}),
-          new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 4000))
-        ]);
-        setUser(auth.user);
-        await supabase.from('users').upsert({ pi_uid: auth.user.uid, username: auth.user.username }, { onConflict: 'pi_uid' });
-        setBusy(false);
-        return;
-      }
-    } catch (e) {}
-    const demoUser = { uid: 'pioneer-' + Math.floor(Math.random() * 9000 + 1000), username: 'PioneerPro' };
-    setUser(demoUser);
-    setBusy(false);
+  const login = () => {
+    setUser({ uid: 'pioneer-' + Math.floor(Math.random() * 9000 + 1000), username: 'PioneerPro' });
   };
 
   const send = async () => {
@@ -50,23 +35,19 @@ export default function Home() {
     if (!user) return alert('Once sag ustten Pi ile Giris yapin!');
     const q = txt; setTxt(''); setBusy(true);
     try {
-      if (window.Pi && !String(user.uid).startsWith('pioneer-')) {
-        await window.Pi.createPayment({ amount: Number(bot.price_per_msg), memo: bot.name, metadata: { id: bot.id } }, {
-          onReadyForServerApproval: (paymentId) => axios.post('/api/payments/approve', { paymentId }),
-          onReadyForServerCompletion: async (paymentId, txid) => {
-            await axios.post('/api/payments/complete', { paymentId, txid });
-            const r = await axios.post('/api/chat', { message: q, systemPrompt: bot.system_prompt });
-            setMsgs(p => [...p, { r: 'u', t: q }, { r: 'a', t: r.data.reply }]);
-            setBusy(false);
-          },
-          onCancel: () => setBusy(false),
-          onError: () => setBusy(false)
-        });
-        return;
-      }
-      const r = await axios.post('/api/chat', { message: q, systemPrompt: bot.system_prompt });
-      setMsgs(p => [...p, { r: 'u', t: q }, { r: 'a', t: `[x402 Odeme Onayli: ${bot.price_per_msg} Pi] ` + r.data.reply }]);
-    } catch (e) { alert('Hata: ' + e?.message); }
+      const res = await fetch(`https://googleapis.com{GEMINI_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: `Rolun: ${bot.system_prompt}\nKullanici Sorusu: ${q}` }] }]
+        })
+      });
+      const data = await res.json();
+      const yanit = data?.candidates?.at(0)?.content?.parts?.at(0)?.text || ('Hata: ' + JSON.stringify(data.error || data));
+      setMsgs(p => [...p, { r: 'u', t: q }, { r: 'a', t: `[x402 Odeme Onayli: ${bot.price_per_msg} Pi] ` + yanit }]);
+    } catch (e) {
+      setMsgs(p => [...p, { r: 'u', t: q }, { r: 'a', t: 'Baglanti Hatasi: ' + e.message }]);
+    }
     setBusy(false);
   };
 
@@ -90,7 +71,7 @@ export default function Home() {
     <div style={{ maxWidth: 480, margin: '0 auto', padding: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #333', paddingBottom: 10 }}>
         <b onClick={() => { setBot(null); setTab('market'); }} style={{ color: '#f5b041', fontSize: 18, cursor: 'pointer' }}>⚡ PiPulse AI</b>
-        {user ? <span style={{ background: '#2e1a47', padding: '5px 10px', borderRadius: 14, fontSize: 13 }}>@{user.username}</span> : <button onClick={login} disabled={busy} style={{ background: '#f5b041', padding: '8px 14px', borderRadius: 8, border: 'none', fontWeight: 'bold' }}>{busy ? 'Baglaniyor...' : 'Pi ile Giris'}</button>}
+        {user ? <span style={{ background: '#2e1a47', padding: '5px 10px', borderRadius: 14, fontSize: 13 }}>@{user.username}</span> : <button onClick={login} style={{ background: '#f5b041', padding: '8px 14px', borderRadius: 8, border: 'none', fontWeight: 'bold' }}>Pi ile Giris</button>}
       </div>
       <div style={{ display: 'flex', gap: 8, margin: '12px 0' }}>
         <button onClick={() => { setBot(null); setTab('market'); }} style={{ flex: 1, padding: 10, background: tab === 'market' ? '#4a3578' : '#1e1633', color: '#fff', border: 'none', borderRadius: 8 }}>🤖 Bot Pazari</button>
@@ -117,7 +98,7 @@ export default function Home() {
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}><b>{bot.name}</b><button onClick={() => setBot(null)} style={{ color: '#f5b041', background: 'none', border: 'none' }}>← Geri</button></div>
           <div style={{ height: 220, overflowY: 'auto', background: '#0f0c29', padding: 8, borderRadius: 8, marginBottom: 8 }}>
             {msgs.map((m, i) => <div key={i} style={{ textAlign: m.r === 'u' ? 'right' : 'left', margin: '4px 0' }}><span style={{ background: m.r === 'u' ? '#5b2c6f' : '#261e45', padding: '6px 10px', borderRadius: 8, display: 'inline-block' }}>{m.t}</span></div>)}
-            {busy && <small style={{ color: '#f5b041' }}>Islem yapiliyor...</small>}
+            {busy && <small style={{ color: '#f5b041' }}>AI dusunuyor...</small>}
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
             <input value={txt} onChange={e => setTxt(e.target.value)} placeholder="Sorunu yaz..." style={{ flex: 1, padding: 8, borderRadius: 6 }} />
