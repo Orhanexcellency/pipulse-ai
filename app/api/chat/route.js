@@ -5,18 +5,19 @@ export async function POST(req) {
     const { message, systemPrompt } = await req.json();
     const apiKey = (process.env.GEMINI_API_KEY || '').trim();
     if (!apiKey) {
-      return NextResponse.json({ success: true, reply: '⚠️ Vercel ayarlarinda GEMINI_API_KEY eksik.' });
+      return NextResponse.json({ success: true, reply: '⚠️ GEMINI_API_KEY eksik.' });
     }
 
-    const url = `https://googleapis.com{apiKey}`;
-    const res = await fetch(url, {
+    const res = await fetch('https://googleapis.com', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey,
+      },
       body: JSON.stringify({
         contents: [
           {
-            role: 'user',
-            parts: [{ text: `Talimat: ${systemPrompt || 'Sen Pi Network ekosisteminde uzman bir yapay zeka asistanisin.'}\n\nKullanici Sorusu: ${message}` }],
+            parts: [{ text: `Talimat: ${systemPrompt || 'Sen Pi Network ekosisteminde uzman bir yapay zeka asistanisin.'}\n\nSoru: ${message}` }],
           },
         ],
       }),
@@ -27,11 +28,10 @@ export async function POST(req) {
       return NextResponse.json({ success: true, reply: '⚠️ Gemini Hatasi: ' + (data.error?.message || res.status) });
     }
 
-    const candidate = Array.isArray(data.candidates) ? data.candidates.at(0) : null;
-    const part = Array.isArray(candidate?.content?.parts) ? candidate.content.parts.at(0) : null;
-    const reply = part?.text || '⚡ Yanit olusturuldu.';
+    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || '⚡ Yanit olusturuldu.';
     return NextResponse.json({ success: true, reply });
   } catch (error) {
-    return NextResponse.json({ success: true, reply: '⚠️ Hata: ' + error.message });
+    const detail = error.cause ? ` (${error.cause.code || error.cause.message})` : '';
+    return NextResponse.json({ success: true, reply: '⚠️ Hata: ' + error.message + detail });
   }
 }
