@@ -1,35 +1,34 @@
 import { NextResponse } from 'next/server';
+import axios from 'axios';
 
 export async function POST(req) {
   try {
     const { message, systemPrompt } = await req.json();
-    const apiKey = (process.env.GEMINI_API_KEY || '').trim();
-    if (!apiKey) {
-      return NextResponse.json({ success: true, reply: '⚠️ Vercel ayarlarinda GEMINI_API_KEY eksik.' });
-    }
-
-    const res = await fetch(`https://googleapis.com{apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [{ text: `Rolun: ${systemPrompt || 'Sen Pi Network konusunda uzman bir yapay zeka asistanisin.'}\n\nKullanici Sorusu: ${message}` }],
-          },
+    const apiKey = (process.env.GROQ_API_KEY || '').trim();
+    
+    const { data } = await axios.post(
+      'https://groq.com',
+      {
+        model: 'llama-3.1-8b-instant',
+        messages: [
+          { role: 'system', content: systemPrompt || 'Sen Pi Network konusunda uzman bir yapay zeka asistanisin. Kullanicinin dilinde kisa ve net cevap ver.' },
+          { role: 'user', content: message },
         ],
-      }),
-    });
+        max_tokens: 400,
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        timeout: 8000,
+      }
+    );
 
-    const data = await res.json();
-    if (!res.ok) {
-      return NextResponse.json({ success: true, reply: '⚠️ Gemini Uyarisi: ' + (data.error?.message || res.status) });
-    }
-
-    const candidate = Array.isArray(data.candidates) ? data.candidates.at(0) : null;
-    const part = Array.isArray(candidate?.content?.parts) ? candidate.content.parts.at(0) : null;
-    const reply = part?.text || '⚡ Yanit olusturuldu.';
+    const reply = data?.choices?.at(0)?.message?.content || '⚡ Yanit olusturuldu.';
     return NextResponse.json({ success: true, reply });
   } catch (e) {
-    return NextResponse.json({ success: true, reply: '⚠️ Sunucu Uyarisi: ' + e.message });
+    const errMsg = e.response?.data?.error?.message || e.message;
+    return NextResponse.json({ success: true, reply: '⚠️ Bilgi: ' + errMsg });
   }
 }
