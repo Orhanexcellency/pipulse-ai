@@ -3,28 +3,33 @@ import { NextResponse } from 'next/server';
 export async function POST(req) {
   try {
     const { message, systemPrompt } = await req.json();
-    const prompt = encodeURIComponent(`Rolun: ${systemPrompt || 'Sen Pi Network konusunda uzman bir yapay zeka asistanisin. Kullanicinin dilinde kisa ve net cevap ver.'}\nSoru: ${message}`);
-    
-    const res = await fetch(`https://pollinations.ai{prompt}`, {
-      method: 'GET',
-      cache: 'no-store'
-    });
-
-    if (res.ok) {
-      const aiText = await res.text();
-      if (aiText && aiText.trim().length > 0) {
-        return NextResponse.json({ success: true, reply: aiText.trim() });
-      }
+    const apiKey = (process.env.GEMINI_API_KEY || '').trim();
+    if (!apiKey) {
+      return NextResponse.json({ success: true, reply: '⚠️ Vercel ayarlarinda GEMINI_API_KEY eksik.' });
     }
 
-    return NextResponse.json({ 
-      success: true, 
-      reply: `⚡ [PiPulse AI]: "${message}" sorunuz islendi. Su an canli AI sunucusu yogun, lutfen tekrar deneyin.` 
+    const res = await fetch(`https://googleapis.com{apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [{ text: `Rolun: ${systemPrompt || 'Sen Pi Network konusunda uzman bir yapay zeka asistanisin.'}\n\nKullanici Sorusu: ${message}` }],
+          },
+        ],
+      }),
     });
+
+    const data = await res.json();
+    if (!res.ok) {
+      return NextResponse.json({ success: true, reply: '⚠️ Gemini Uyarisi: ' + (data.error?.message || res.status) });
+    }
+
+    const candidate = Array.isArray(data.candidates) ? data.candidates.at(0) : null;
+    const part = Array.isArray(candidate?.content?.parts) ? candidate.content.parts.at(0) : null;
+    const reply = part?.text || '⚡ Yanit olusturuldu.';
+    return NextResponse.json({ success: true, reply });
   } catch (e) {
-    return NextResponse.json({ 
-      success: true, 
-      reply: `⚡ [PiPulse AI]: "${message}" talebiniz alindi. Lutfen birazdan tekrar deneyin.` 
-    });
+    return NextResponse.json({ success: true, reply: '⚠️ Sunucu Uyarisi: ' + e.message });
   }
 }
