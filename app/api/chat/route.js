@@ -7,20 +7,23 @@ export async function POST(req) {
     const apiKey = (process.env.GEMINI_API_KEY || '').trim();
 
     const { data } = await axios.post(
-      `https://googleapis.com{apiKey}`,
+      'https://googleapis.com',
       {
         contents: [
           {
             parts: [
               {
-                text: `Rolun: ${systemPrompt || 'Sen Pi Network konusunda uzman bir yapay zeka asistanisin. Kullanicinin dilinde kisa ve net cevap ver.'}\n\nSoru: ${message}`,
+                text: `Rolun: ${systemPrompt || 'Sen Pi Network konusunda uzman bir yapay zeka asistanisin.'}\n\nSoru: ${message}`,
               },
             ],
           },
         ],
       },
       {
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey,
+        },
         timeout: 9000,
       }
     );
