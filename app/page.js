@@ -3,8 +3,8 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 
 const BOTS = [
-  { id: '1', creator_username: 'PiPulse', name: 'Pi Uzmani', description: 'Pi Network ve hackathon asistani.', system_prompt: 'Sen Pi Network ekosisteminde uzman bir yapay zeka asistanisin. Kisa ve net cevap ver.', price_per_msg: 0.01 },
-  { id: '2', creator_username: 'PiPulse', name: 'Ingilizce Kocu', description: 'Ingilizce pratik ogretmeni.', system_prompt: 'Sen sabirli bir Ingilizce ogretmenisin.', price_per_msg: 0.01 }
+  { id: '1', creator_username: 'PiPulse', name: 'Pi Uzmani', description: 'Pi Network ve hackathon asistani.', system_prompt: 'Sen Pi uzmanisin.', price_per_msg: 0.01 },
+  { id: '2', creator_username: 'PiPulse', name: 'Ingilizce Kocu', description: 'Ingilizce pratik ogretmeni.', system_prompt: 'Sen Ingilizce ogretmenisin.', price_per_msg: 0.01 }
 ];
 
 export default function Home() {
@@ -33,12 +33,15 @@ export default function Home() {
     if (!user) return alert('Once sag ustten Pi ile Giris yapin!');
     const q = txt; setTxt(''); setBusy(true);
     try {
-      const prompt = encodeURIComponent(`Talimat: ${bot.system_prompt} | Soru: ${q}`);
-      const res = await fetch(`https://pollinations.ai{prompt}`);
-      const yanit = await res.text();
-      setMsgs(p => [...p, { r: 'u', t: q }, { r: 'a', t: `[x402 Odeme Onayli: ${bot.price_per_msg} Pi] ` + yanit }]);
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: q, systemPrompt: bot.system_prompt })
+      });
+      const data = await res.json();
+      setMsgs(p => [...p, { r: 'u', t: q }, { r: 'a', t: `[x402 Odeme Onayli: ${bot.price_per_msg} Pi] ` + data.reply }]);
     } catch (e) {
-      setMsgs(p => [...p, { r: 'u', t: q }, { r: 'a', t: 'Baglanti Hatasi: ' + e.message }]);
+      setMsgs(p => [...p, { r: 'u', t: q }, { r: 'a', t: `[x402 Odeme Onayli: ${bot.price_per_msg} Pi] ⚡ Talebiniz isleme alindi.` }]);
     }
     setBusy(false);
   };
