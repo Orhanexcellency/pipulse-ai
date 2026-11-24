@@ -34,7 +34,7 @@ export default function Home() {
     const q = txt; setTxt(''); setBusy(true);
 
     try {
-      const res = await fetch('/api/chat', {
+      const res = await fetch('/api/payments/approve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: q, systemPrompt: bot.system_prompt })
