@@ -3,8 +3,8 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 
 const BOTS = [
-  { id: '1', creator_uid: 'sys', creator_username: 'PiPulse', name: 'Pi Uzmani', description: 'Pi Network ve hackathon asistani.', system_prompt: 'Sen Pi Network uzmanisin. Kisa ve net cevap ver.', price_per_msg: 0.01 },
-  { id: '2', creator_uid: 'sys', creator_username: 'PiPulse', name: 'Global Tercuman', description: 'Anlik cok dilli cevirmen.', system_prompt: 'Sen profesyonel tercumansin.', price_per_msg: 0.01 }
+  { id: '1', creator_uid: 'sys', creator_username: 'PiPulse', name: 'Pi Uzmani', description: 'Pi Network ve hackathon asistani.', system_prompt: 'Sen Pi Network uzmanisin. Kisa ve net cevap ver.', price_per_msg: 0.21 },
+  { id: '2', creator_uid: 'sys', creator_username: 'PiPulse', name: 'Global Tercuman', description: 'Anlik cok dilli cevirmen.', system_prompt: 'Sen profesyonel tercumansin.', price_per_msg: 0.21 }
 ];
 const LANGS = [['🇹🇷 TR','Turkish'],['🇬🇧 EN','English'],['🇨🇳 ZH','Chinese'],['🇪🇸 ES','Spanish'],['🇮🇳 HI','Hindi'],['🇻🇳 VI','Vietnamese'],['🇰🇷 KO','Korean'],['🇸🇦 AR','Arabic'],['🇮🇩 ID','Indonesian'],['🇷🇺 RU','Russian']];
 
