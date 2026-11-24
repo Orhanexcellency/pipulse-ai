@@ -3,8 +3,13 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 
 const BOTS = [
-  { id: '1', creator_uid: 'system', creator_username: 'PiPulse', name: 'Pi Uzmani', description: 'Pi Network, Web3 ve hackathon asistani.', system_prompt: 'Sen Pi Network konusunda uzman bir yapay zeka asistanisin. Kisa, net ve analitik Turkce cevap ver.', price_per_msg: 0.01 },
-  { id: '2', creator_uid: 'system', creator_username: 'PiPulse', name: 'Global Tercuman', description: 'Anlik profesyonel cok dilli cevirmen.', system_prompt: 'Sen profesyonel bir tercuman ve dil uzmanisin. Metinleri dogal ve akici sekilde cevir.', price_per_msg: 0.01 }
+  { id: '1', creator_uid: 'system', creator_username: 'PiPulse', name: 'Pi Uzmani', description: 'Pi Network, Web3 ve hackathon asistani.', system_prompt: 'Sen Pi Network uzmanisin. Kisa, net ve analitik cevap ver.', price_per_msg: 0.01 },
+  { id: '2', creator_uid: 'system', creator_username: 'PiPulse', name: 'Global Tercuman', description: 'Anlik profesyonel cok dilli cevirmen.', system_prompt: 'Sen profesyonel bir tercumansin. Metinleri dogal sekilde cevir.', price_per_msg: 0.01 }
+];
+
+const LANGS = [
+  ['🇹🇷 TR', 'Turkish'], ['🇬🇧 EN', 'English'], ['🇨🇳 ZH', 'Chinese'], ['🇪🇸 ES', 'Spanish'], ['🇮🇳 HI', 'Hindi'],
+  ['🇻🇳 VI', 'Vietnamese'], ['🇰🇷 KO', 'Korean'], ['🇸🇦 AR', 'Arabic'], ['🇮🇩 ID', 'Indonesian'], ['🇷🇺 RU', 'Russian']
 ];
 
 export default function Home() {
@@ -14,6 +19,7 @@ export default function Home() {
   const [msgs, setMsgs] = useState([]);
   const [txt, setTxt] = useState('');
   const [busy, setBusy] = useState(false);
+  const [trIdx, setTrIdx] = useState(null);
   const [tab, setTab] = useState('market');
   const [totalPi, setTotalPi] = useState(0);
   const [form, setForm] = useState({ name: '', description: '', system_prompt: '', price: 0.01 });
@@ -25,37 +31,40 @@ export default function Home() {
     if (data?.length) setAgents(data);
   };
 
-  const login = () => {
-    setUser({ uid: 'pioneer-pro-user', username: 'PioneerPro' });
-  };
+  const login = () => setUser({ uid: 'pioneer-pro-user', username: 'PioneerPro' });
 
   const send = async () => {
     if (!txt.trim() || !bot) return;
     if (!user) return alert('Once sag ustten Pi ile Giris yapin!');
     const q = txt; setTxt(''); setBusy(true);
-
-    // Son 4 mesaji hafiza olarak birlestir
-    const history = msgs.slice(-4).map(m => `${m.r === 'u' ? 'Kullanici' : 'Asistan'}: ${m.t}`).join('\n');
-    const contextPrompt = history ? `${bot.system_prompt}\n\nOnceki Konusma:\n${history}` : bot.system_prompt;
-
+    const hist = msgs.slice(-4).map(m => `${m.r === 'u' ? 'User' : 'AI'}: ${m.t}`).join('\n');
+    const prompt = hist ? `${bot.system_prompt}\n\nHistory:\n${hist}` : bot.system_prompt;
     try {
       const res = await fetch('/api/payments/approve', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: q, systemPrompt: contextPrompt })
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: q, systemPrompt: prompt })
       });
-      const text = await res.text();
-      let yanit = text;
-      try {
-        const data = JSON.parse(text);
-        yanit = data.reply || text;
-      } catch (e) {}
-      setTotalPi(prev => Number((prev + Number(bot.price_per_msg)).toFixed(2)));
-      setMsgs(p => [...p, { r: 'u', t: q }, { r: 'a', t: `[x402 Odeme Onayli: ${bot.price_per_msg} Pi] ` + yanit }]);
-    } catch (err) {
-      setMsgs(p => [...p, { r: 'u', t: q }, { r: 'a', t: '⚠️ Ag Hatasi: ' + err.message }]);
+      const data = await res.json();
+      setTotalPi(p => Number((p + Number(bot.price_per_msg)).toFixed(2)));
+      setMsgs(p => [...p, { r: 'u', t: q }, { r: 'a', t: `[x402 Odeme Onayli: ${bot.price_per_msg} Pi] ` + (data.reply || 'Yanit olusturuldu.') }]);
+    } catch (e) {
+      setMsgs(p => [...p, { r: 'u', t: q }, { r: 'a', t: '⚠️ Hata: ' + e.message }]);
     }
     setBusy(false);
+  };
+
+  const trMsg = async (idx, raw, lang) => {
+    setTrIdx(idx);
+    try {
+      const clean = raw.replace(/^\[x402.*?\]\s*/, '');
+      const res = await fetch('/api/payments/approve', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: clean, systemPrompt: `Translate naturally into ${lang}. Return ONLY the translation.` })
+      });
+      const data = await res.json();
+      if (data?.reply) setMsgs(p => p.map((m, i) => i === idx ? { ...m, tr: `[🌐 ${lang}]: ${data.reply}` } : m));
+    } catch (e) {}
+    setTrIdx(null);
   };
 
   const create = async (e) => {
@@ -68,15 +77,14 @@ export default function Home() {
     });
     setBusy(false);
     if (error) return alert('DB Hatasi: ' + error.message);
-    alert('Tebrikler! Uzman botunuz pazarda yayinlandi.');
+    alert('Tebrikler! Botunuz yayinlandi.');
     setForm({ name: '', description: '', system_prompt: '', price: 0.01 });
-    setTab('market');
-    getBots();
+    setTab('market'); getBots();
   };
 
-  const deleteBot = async (e, id) => {
+  const delBot = async (e, id) => {
     e.stopPropagation();
-    if (!confirm('Bu botu silmek istediginize emin misiniz?')) return;
+    if (!confirm('Botu silmek istiyor musunuz?')) return;
     await supabase.from('ai_agents').delete().eq('id', id);
     getBots();
   };
@@ -86,63 +94,64 @@ export default function Home() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #333', paddingBottom: 10 }}>
         <b onClick={() => { setBot(null); setTab('market'); }} style={{ color: '#f5b041', fontSize: 18, cursor: 'pointer' }}>⚡ PiPulse AI</b>
         {user ? (
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 6 }}>
             <span style={{ background: '#1e3a2f', color: '#4ade80', padding: '4px 8px', borderRadius: 12, fontSize: 12 }}>x402: {totalPi} Pi</span>
             <span style={{ background: '#2e1a47', padding: '5px 10px', borderRadius: 14, fontSize: 12 }}>@{user.username}</span>
           </div>
-        ) : (
-          <button onClick={login} style={{ background: '#f5b041', padding: '8px 14px', borderRadius: 8, border: 'none', fontWeight: 'bold' }}>Pi ile Giris</button>
-        )}
+        ) : <button onClick={login} style={{ background: '#f5b041', padding: '8px 14px', borderRadius: 8, border: 'none', fontWeight: 'bold' }}>Pi ile Giris</button>}
       </div>
-
       <div style={{ display: 'flex', gap: 8, margin: '12px 0' }}>
         <button onClick={() => { setBot(null); setTab('market'); }} style={{ flex: 1, padding: 10, background: tab === 'market' ? '#4a3578' : '#1e1633', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 'bold' }}>🤖 Bot Pazari</button>
         <button onClick={() => { setBot(null); setTab('create'); }} style={{ flex: 1, padding: 10, background: tab === 'create' ? '#7d3c98' : '#1e1633', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 'bold' }}>+ Bot Olustur</button>
       </div>
-
       {tab === 'create' && (
         <form onSubmit={create} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <input placeholder="Bot Adi (orn: Kripto Analist)" value={form.name} onChange={e => setForm({...form, name: e.target.value})} required style={{ padding: 11, borderRadius: 8 }} />
-          <input placeholder="Kisa Aciklama" value={form.description} onChange={e => setForm({...form, description: e.target.value})} required style={{ padding: 11, borderRadius: 8 }} />
-          <textarea rows={4} placeholder="Uzmanlik Talimati (Botun karakterini ve kurallarini yazin)" value={form.system_prompt} onChange={e => setForm({...form, system_prompt: e.target.value})} required style={{ padding: 11, borderRadius: 8 }} />
-          <input type="number" step="0.01" min="0.01" placeholder="Mesaj Basi Ucret (Pi)" value={form.price} onChange={e => setForm({...form, price: e.target.value})} required style={{ padding: 11, borderRadius: 8 }} />
-          <button type="submit" disabled={busy} style={{ background: '#f5b041', padding: 13, borderRadius: 8, fontWeight: 'bold', border: 'none' }}>{busy ? 'Kaydediliyor...' : 'Botu Pazarda Yayinla'}</button>
+          <input placeholder="Bot Adi" value={form.name} onChange={e => setForm({...form, name: e.target.value})} required style={{ padding: 11, borderRadius: 8 }} />
+          <input placeholder="Aciklama" value={form.description} onChange={e => setForm({...form, description: e.target.value})} required style={{ padding: 11, borderRadius: 8 }} />
+          <textarea rows={3} placeholder="Talimat (Prompt)" value={form.system_prompt} onChange={e => setForm({...form, system_prompt: e.target.value})} required style={{ padding: 11, borderRadius: 8 }} />
+          <input type="number" step="0.01" min="0.01" value={form.price} onChange={e => setForm({...form, price: e.target.value})} required style={{ padding: 11, borderRadius: 8 }} />
+          <button type="submit" disabled={busy} style={{ background: '#f5b041', padding: 13, borderRadius: 8, fontWeight: 'bold', border: 'none' }}>{busy ? 'Kaydediliyor...' : 'Yayinla'}</button>
         </form>
       )}
-
       {tab === 'market' && !bot && agents.map(b => (
-        <div key={b.id} onClick={() => { setBot(b); setMsgs([]); }} style={{ background: '#1a142e', padding: 14, borderRadius: 12, marginBottom: 10, border: '1px solid #4a3578', cursor: 'pointer' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <b style={{ color: '#f5b041', fontSize: 16 }}>{b.name}</b>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <span style={{ background: '#2e1a47', padding: '3px 8px', borderRadius: 8, fontSize: 12 }}>{b.price_per_msg} Pi</span>
-              {user && b.creator_uid === user.uid && (
-                <button onClick={(e) => deleteBot(e, b.id)} style={{ background: '#7f1d1d', color: '#fca5a5', border: 'none', padding: '3px 8px', borderRadius: 6, fontSize: 11 }}>Sil</button>
-              )}
+        <div key={b.id} onClick={() => { setBot(b); setMsgs([]); }} style={{ background: '#1a142e', padding: 14, borderRadius: 12, marginBottom: 10, border: '1px solid #4a3578' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <b style={{ color: '#f5b041' }}>{b.name}</b>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <span style={{ background: '#2e1a47', padding: '2px 8px', borderRadius: 8, fontSize: 12 }}>{b.price_per_msg} Pi</span>
+              {user && b.creator_uid === user.uid && <button onClick={e => delBot(e, b.id)} style={{ background: '#7f1d1d', color: '#fca5a5', border: 'none', padding: '2px 8px', borderRadius: 6, fontSize: 11 }}>Sil</button>}
             </div>
           </div>
-          <p style={{ fontSize: 13, margin: '6px 0', color: '#ddd' }}>{b.description}</p>
-          <small style={{ color: '#999' }}>Olusturan: @{b.creator_username}</small>
+          <p style={{ fontSize: 13, margin: '6px 0' }}>{b.description}</p>
+          <small style={{ color: '#999' }}>@{b.creator_username}</small>
         </div>
       ))}
-
       {bot && (
         <div style={{ background: '#1a142e', padding: 12, borderRadius: 12, border: '1px solid #4a3578' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <div><b>{bot.name}</b> <small style={{ color: '#4ade80' }}>● Hafiza Aktif</small></div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+            <b>{bot.name} <small style={{ color: '#4ade80' }}>● Hafiza</small></b>
             <button onClick={() => setBot(null)} style={{ color: '#f5b041', background: 'none', border: 'none', fontWeight: 'bold' }}>← Geri</button>
           </div>
           <div style={{ height: '52vh', minHeight: 340, overflowY: 'auto', background: '#0f0c29', padding: 10, borderRadius: 10, marginBottom: 10 }}>
-            {msgs.length === 0 && <p style={{ color: '#666', fontSize: 13, textAlign: 'center', marginTop: 40 }}>{bot.name} hazir. Sorunuzu yazin (Mesaj basi {bot.price_per_msg} Pi).</p>}
             {msgs.map((m, i) => (
               <div key={i} style={{ textAlign: m.r === 'u' ? 'right' : 'left', margin: '8px 0' }}>
-                <span style={{ background: m.r === 'u' ? '#5b2c6f' : '#261e45', padding: '8px 12px', borderRadius: 10, display: 'inline-block', fontSize: 14, lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>{m.t}</span>
+                <div style={{ background: m.r === 'u' ? '#5b2c6f' : '#261e45', padding: '8px 12px', borderRadius: 10, display: 'inline-block', fontSize: 14, whiteSpace: 'pre-wrap' }}>
+                  {m.t}
+                  {m.tr && <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid #4a3578', color: '#a5f3fc', fontSize: 13 }}>{m.tr}</div>}
+                </div>
+                {m.r === 'a' && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 5 }}>
+                    {LANGS.map(([label, code]) => (
+                      <button key={code} onClick={() => trMsg(i, m.t, code)} disabled={trIdx === i} style={{ background: '#1e1633', color: '#f5b041', border: '1px solid #4a3578', borderRadius: 6, padding: '2px 6px', fontSize: 10 }}>{label}</button>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
             {busy && <small style={{ color: '#f5b041' }}>AI analiz ediyor...</small>}
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
-            <input value={txt} onChange={e => setTxt(e.target.value)} onKeyDown={e => e.key === 'Enter' && send()} placeholder="Sorunu yaz..." style={{ flex: 1, padding: 10, borderRadius: 8 }} />
+            <input value={txt} onChange={e => setTxt(e.target.value)} placeholder="Sorunu yaz..." style={{ flex: 1, padding: 10, borderRadius: 8 }} />
             <button onClick={send} disabled={busy} style={{ background: '#f5b041', padding: '10px 16px', borderRadius: 8, fontWeight: 'bold', border: 'none' }}>Gonder</button>
           </div>
         </div>
