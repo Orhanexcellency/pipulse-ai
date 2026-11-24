@@ -4,44 +4,32 @@ import axios from 'axios';
 export async function POST(req) {
   try {
     const { message, systemPrompt } = await req.json();
-    const apiKey = (process.env.GEMINI_API_KEY || '').trim();
-    const payload = {
-      contents: [
-        {
-          role: 'user',
-          parts: [
-            {
-              text: `Rolun: ${systemPrompt || 'Sen Pi Network konusunda uzman bir yapay zeka asistanisin. Kullanicinin dilinde kisa ve net cevap ver.'}\n\nSoru: ${message}`,
-            },
-          ],
+    const key = (process.env.GROQ_API_KEY || '').trim();
+    const endpoint = 'https://groq.com' + '/chat/completions';
+
+    const { data } = await axios.post(
+      endpoint,
+      {
+        model: 'llama-3.1-8b-instant',
+        messages: [
+          { role: 'system', content: systemPrompt || 'Sen Pi Network konusunda uzman bir yapay zeka asistanisin. Kisa ve net Turkce cevap ver.' },
+          { role: 'user', content: message },
+        ],
+        max_tokens: 400,
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${key}`,
+          'Content-Type': 'application/json',
         },
-      ],
-    };
-
-    const endpoints = [
-      'https://googleapis.com',
-      'https://googleapis.com',
-    ];
-
-    let lastError = '';
-    for (const url of endpoints) {
-      try {
-        const { data } = await axios.post(`${url}?key=${apiKey}`, payload, {
-          headers: { 'Content-Type': 'application/json' },
-          timeout: 8000,
-        });
-        const candidate = Array.isArray(data?.candidates) ? data.candidates.at(0) : null;
-        const part = Array.isArray(candidate?.content?.parts) ? candidate.content.parts.at(0) : null;
-        if (part?.text) {
-          return NextResponse.json({ success: true, reply: part.text });
-        }
-      } catch (err) {
-        lastError = err.response?.data?.error?.message || err.message;
+        timeout: 9000,
       }
-    }
+    );
 
-    return NextResponse.json({ success: true, reply: '⚠️ Detay: ' + lastError });
+    const reply = data?.choices?.at(0)?.message?.content || 'Yanit olusturuldu.';
+    return NextResponse.json({ success: true, reply });
   } catch (e) {
-    return NextResponse.json({ success: true, reply: '⚠️ Hata: ' + e.message });
+    const msg = e.response?.data?.error?.message || e.message;
+    return NextResponse.json({ success: true, reply: '⚠️ Hata: ' + msg });
   }
 }
