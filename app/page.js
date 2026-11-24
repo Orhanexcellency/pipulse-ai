@@ -11,7 +11,8 @@ const LANGS = [['🇹🇷 TR','Turkish'],['🇬🇧 EN','English'],['🇨🇳 ZH
 export default function Home() {
   const [user, setUser] = useState(null), [agents, setAgents] = useState(BOTS), [bot, setBot] = useState(null);
   const [msgs, setMsgs] = useState([]), [txt, setTxt] = useState(''), [busy, setBusy] = useState(false);
-  const [trIdx, setTrIdx] = useState(null), [tab, setTab] = useState('market'), [totalPi, setTotalPi] = useState(0);
+  const [trIdx, setTrIdx] = useState(null), [tab, setTab] = useState('market');
+  const [txs, setTxs] = useState([{ t: 'Referans & Hosgeldin Bonusu', a: '+0.50 Pi', c: '#4ade80' }]);
   const [form, setForm] = useState({ name: '', description: '', system_prompt: '', price: 0.01 });
 
   useEffect(() => { getBots(); }, []);
@@ -19,15 +20,14 @@ export default function Home() {
   const login = () => setUser({ uid: 'pioneer-pro-user', username: 'PioneerPro' });
 
   const send = async () => {
-    if (!txt.trim() || !bot) return;
-    if (!user) return alert('Once Pi ile Giris yapin!');
+    if (!txt.trim() || !bot) return; if (!user) return alert('Once Pi ile Giris yapin!');
     const q = txt; setTxt(''); setBusy(true);
     const hist = msgs.slice(-4).map(m => `${m.r === 'u' ? 'User' : 'AI'}: ${m.t}`).join('\n');
     try {
       const res = await fetch('/api/payments/approve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: q, systemPrompt: hist ? `${bot.system_prompt}\n\nHistory:\n${hist}` : bot.system_prompt }) });
       const data = await res.json();
-      setTotalPi(p => Number((p + Number(bot.price_per_msg)).toFixed(2)));
-      setMsgs(p => [...p, { r: 'u', t: q }, { r: 'a', t: `[x402 Odeme Onayli: ${bot.price_per_msg} Pi] ` + (data.reply || 'Yanit olusturuldu.') }]);
+      setTxs(p => [{ t: `x402 Soru (${bot.name})`, a: `-${bot.price_per_msg} Pi`, c: '#f87171' }, ...p]);
+      setMsgs(p => [...p, { r: 'u', t: q }, { r: 'a', t: `[x402 Odeme: ${bot.price_per_msg} Pi] ` + (data.reply || 'Yanit hazir.') }]);
     } catch (e) { setMsgs(p => [...p, { r: 'u', t: q }, { r: 'a', t: '⚠️ Hata: ' + e.message }]); }
     setBusy(false);
   };
@@ -35,18 +35,17 @@ export default function Home() {
   const trMsg = async (idx, raw, lang) => {
     setTrIdx(idx); setMsgs(p => p.map((m, i) => i === idx ? { ...m, tr: `⏳ ${lang} cevriliyor...` } : m));
     try {
-      const res = await fetch('/api/payments/approve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: raw.replace(/^\[x402.*?\]\s*/, ''), systemPrompt: `Translate naturally into ${lang}. Return ONLY the translation.` }) });
+      const res = await fetch('/api/payments/approve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: raw.replace(/^\[x402.*?\]\s*/, ''), systemPrompt: `Translate into ${lang}. Return ONLY translation.` }) });
       const data = await res.json();
       setMsgs(p => p.map((m, i) => i === idx ? { ...m, tr: `[🌐 ${lang}]: ${data.reply || 'Tekrar deneyin.'}` } : m));
-    } catch (e) { setMsgs(p => p.map((m, i) => i === idx ? { ...m, tr: `⚠️ Hata: ${e.message}` } : m)); }
-    setTrIdx(null);
+    } catch (e) {} setTrIdx(null);
   };
-
   const create = async (e) => {
     e.preventDefault(); if (!user) return alert('Once Pi ile Giris yapin!'); setBusy(true);
     const { error } = await supabase.from('ai_agents').insert({ creator_uid: user.uid, creator_username: user.username, name: form.name, description: form.description, system_prompt: form.system_prompt, price_per_msg: Number(form.price) });
     setBusy(false); if (error) return alert(error.message);
-    alert('Botunuz yayinlandi!'); setForm({ name: '', description: '', system_prompt: '', price: 0.01 }); setTab('market'); getBots();
+    setTxs(p => [{ t: `Bot Yayin Geliri: ${form.name}`, a: '+0.25 Pi', c: '#4ade80' }, ...p]);
+    alert('Bot yayinlandi! +0.25 Pi eklendi.'); setForm({ name: '', description: '', system_prompt: '', price: 0.01 }); setTab('market'); getBots();
   };
 
   const delBot = async (e, id) => { e.stopPropagation(); if (confirm('Silinsin mi?')) { await supabase.from('ai_agents').delete().eq('id', id); getBots(); } };
@@ -55,19 +54,31 @@ export default function Home() {
     <div style={{ maxWidth: 500, margin: '0 auto', padding: 14 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #333', paddingBottom: 10 }}>
         <b onClick={() => { setBot(null); setTab('market'); }} style={{ color: '#f5b041', fontSize: 18 }}>⚡ PiPulse AI</b>
-        {user ? <div style={{ display: 'flex', gap: 6 }}><span style={{ background: '#1e3a2f', color: '#4ade80', padding: '4px 8px', borderRadius: 12, fontSize: 12 }}>x402: {totalPi} Pi</span><span style={{ background: '#2e1a47', padding: '5px 10px', borderRadius: 14, fontSize: 12 }}>@{user.username}</span></div> : <button onClick={login} style={{ background: '#f5b041', padding: '8px 14px', borderRadius: 8, border: 'none', fontWeight: 'bold' }}>Pi ile Giris</button>}
+        {user ? <span style={{ background: '#2e1a47', padding: '5px 10px', borderRadius: 14, fontSize: 12 }}>@{user.username}</span> : <button onClick={login} style={{ background: '#f5b041', padding: '8px 14px', borderRadius: 8, border: 'none', fontWeight: 'bold' }}>Pi ile Giris</button>}
       </div>
-      <div style={{ display: 'flex', gap: 8, margin: '12px 0' }}>
-        <button onClick={() => { setBot(null); setTab('market'); }} style={{ flex: 1, padding: 10, background: tab === 'market' ? '#4a3578' : '#1e1633', color: '#fff', border: 'none', borderRadius: 8 }}>🤖 Bot Pazari</button>
-        <button onClick={() => { setBot(null); setTab('create'); }} style={{ flex: 1, padding: 10, background: tab === 'create' ? '#7d3c98' : '#1e1633', color: '#fff', border: 'none', borderRadius: 8 }}>+ Bot Olustur</button>
+      <div style={{ display: 'flex', gap: 6, margin: '12px 0' }}>
+        <button onClick={() => { setBot(null); setTab('market'); }} style={{ flex: 1, padding: 9, background: tab === 'market' ? '#4a3578' : '#1e1633', color: '#fff', border: 'none', borderRadius: 8, fontSize: 12 }}>🤖 Pazar</button>
+        <button onClick={() => { setBot(null); setTab('create'); }} style={{ flex: 1, padding: 9, background: tab === 'create' ? '#7d3c98' : '#1e1633', color: '#fff', border: 'none', borderRadius: 8, fontSize: 12 }}>+ Bot Kur</button>
+        <button onClick={() => { setBot(null); setTab('wallet'); }} style={{ flex: 1, padding: 9, background: tab === 'wallet' ? '#1e4620' : '#1e1633', color: '#4ade80', border: 'none', borderRadius: 8, fontSize: 12 }}>💰 Cuzdan & Ref</button>
       </div>
+      {tab === 'wallet' && (
+        <div style={{ background: '#1a142e', padding: 14, borderRadius: 12, border: '1px solid #4a3578' }}>
+          <b style={{ color: '#f5b041' }}>🎁 Referans Linki (%10 Pi Komisyon)</b>
+          <div style={{ display: 'flex', gap: 6, margin: '8px 0 14px' }}>
+            <input readOnly value={`https://vercel.app{user?.username || 'Pioneer'}`} style={{ flex: 1, padding: 8, borderRadius: 6, fontSize: 11, background: '#0f0c29', color: '#fff', border: '1px solid #333' }} />
+            <button onClick={() => { navigator.clipboard?.writeText(`https://vercel.app{user?.username || 'Pioneer'}`); alert('Kopyalandi!'); }} style={{ background: '#f5b041', padding: '8px 12px', borderRadius: 6, border: 'none', fontWeight: 'bold', fontSize: 12 }}>Kopyala</button>
+          </div>
+          <b style={{ color: '#f5b041' }}>📊 x402 Gelir / Gider Tablosu</b>
+          {txs.map((x, i) => <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid #2a214a', fontSize: 13 }}><span>{x.t}</span><b style={{ color: x.c }}>{x.a}</b></div>)}
+        </div>
+      )}
       {tab === 'create' && (
         <form onSubmit={create} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <input placeholder="Bot Adi" value={form.name} onChange={e => setForm({...form, name: e.target.value})} required style={{ padding: 11, borderRadius: 8 }} />
           <input placeholder="Aciklama" value={form.description} onChange={e => setForm({...form, description: e.target.value})} required style={{ padding: 11, borderRadius: 8 }} />
           <textarea rows={3} placeholder="Talimat (Prompt)" value={form.system_prompt} onChange={e => setForm({...form, system_prompt: e.target.value})} required style={{ padding: 11, borderRadius: 8 }} />
           <input type="number" step="0.01" min="0.01" value={form.price} onChange={e => setForm({...form, price: e.target.value})} required style={{ padding: 11, borderRadius: 8 }} />
-          <button type="submit" disabled={busy} style={{ background: '#f5b041', padding: 13, borderRadius: 8, fontWeight: 'bold', border: 'none' }}>{busy ? 'Kaydediliyor...' : 'Yayinla'}</button>
+          <button type="submit" disabled={busy} style={{ background: '#f5b041', padding: 13, borderRadius: 8, fontWeight: 'bold', border: 'none' }}>{busy ? 'Kaydediliyor...' : 'Yayinla (+0.25 Pi)'}</button>
         </form>
       )}
       {tab === 'market' && !bot && agents.map(b => (
