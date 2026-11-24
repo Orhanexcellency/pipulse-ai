@@ -7,31 +7,29 @@ export async function POST(req) {
       return NextResponse.json({ approved: true });
     }
 
-    const groqKey = (process.env.GROQ_API_KEY || '').trim();
-    if (!groqKey) {
-      return NextResponse.json({ success: true, reply: '⚠️ GROQ_API_KEY okunamadi.' });
+    const orKey = (process.env.OPENROUTER_API_KEY || '').trim();
+    if (!orKey) {
+      return NextResponse.json({ success: true, reply: '⚠️ Vercel ayarlarinda OPENROUTER_API_KEY eksik.' });
     }
 
-    const res = await fetch('https://groq.com', {
+    const res = await fetch('https://openrouter.ai', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${groqKey}`,
-        'Content-Type': 'application/json'
+        'Authorization': `Bearer ${orKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://vercel.app',
+        'X-Title': 'PiPulse AI'
       },
       body: JSON.stringify({
-        model: 'llama-3.1-8b-instant',
+        model: 'openrouter/free',
         messages: [
-          { role: 'system', content: body.systemPrompt || 'Sen Pi Network uzmanisin. Kisa ve net Turkce cevap ver.' },
+          { role: 'system', content: body.systemPrompt || 'Sen Pi Network konusunda uzman bir yapay zeka asistanisin. Kisa ve net Turkce cevap ver.' },
           { role: 'user', content: body.message }
-        ],
-        max_tokens: 400
+        ]
       })
     });
 
-    const raw = await res.text();
-    let data = {};
-    try { data = JSON.parse(raw); } catch (e) {}
-
+    const data = await res.json();
     const text = data?.choices?.at(0)?.message?.content;
     if (text) {
       return NextResponse.json({ success: true, reply: text });
@@ -39,7 +37,7 @@ export async function POST(req) {
 
     return NextResponse.json({
       success: true,
-      reply: `⚠️ Groq Uyarisi (HTTP ${res.status}): ` + (data?.error?.message || raw.slice(0, 120) || 'Bos yanit')
+      reply: `⚠️ Uyarisi (${res.status}): ` + (data?.error?.message || 'Yanit alinamadi')
     });
   } catch (err) {
     return NextResponse.json({ success: true, reply: '⚠️ Sistem: ' + err.message });
