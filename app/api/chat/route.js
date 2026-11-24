@@ -1,35 +1,34 @@
 import { NextResponse } from 'next/server';
-import axios from 'axios';
 
 export async function POST(req) {
   try {
     const { message, systemPrompt } = await req.json();
-    const key = (process.env.GROQ_API_KEY || '').trim();
-    const endpoint = 'https://groq.com' + '/chat/completions';
+    const apiKey = (process.env.NEXT_PUBLIC_GEMINI_API_KEY || '').trim();
 
-    const { data } = await axios.post(
-      endpoint,
-      {
-        model: 'llama-3.1-8b-instant',
-        messages: [
-          { role: 'system', content: systemPrompt || 'Sen Pi Network konusunda uzman bir yapay zeka asistanisin. Kisa ve net Turkce cevap ver.' },
-          { role: 'user', content: message },
-        ],
-        max_tokens: 400,
+    const url = apiKey.startsWith('AQ.')
+      ? 'https://googleapis.com'
+      : 'https://googleapis.com';
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey
       },
-      {
-        headers: {
-          'Authorization': `Bearer ${key}`,
-          'Content-Type': 'application/json',
-        },
-        timeout: 9000,
-      }
-    );
+      body: JSON.stringify({
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: `Rolun: ${systemPrompt || 'Sen Pi Network konusunda uzman bir yapay zeka asistanisin. Kisa ve net Turkce cevap ver.'}\nSoru: ${message}` }]
+          }
+        ]
+      })
+    });
 
-    const reply = data?.choices?.at(0)?.message?.content || 'Yanit olusturuldu.';
+    const data = await res.json();
+    const reply = data?.candidates?.at(0)?.content?.parts?.at(0)?.text || ('API Cevabi: ' + JSON.stringify(data.error || data));
     return NextResponse.json({ success: true, reply });
   } catch (e) {
-    const msg = e.response?.data?.error?.message || e.message;
-    return NextResponse.json({ success: true, reply: '⚠️ Hata: ' + msg });
+    return NextResponse.json({ success: true, reply: 'Sunucu Hatasi: ' + e.message });
   }
 }
