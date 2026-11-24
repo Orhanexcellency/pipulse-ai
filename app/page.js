@@ -33,24 +33,13 @@ export default function Home() {
     if (!user) return alert('Once sag ustten Pi ile Giris yapin!');
     const q = txt; setTxt(''); setBusy(true);
     try {
-      const key = (process.env.NEXT_PUBLIC_GEMINI_API_KEY || '').trim();
-      const url = key.startsWith('AQ.')
-        ? 'https://googleapis.com'
-        : 'https://googleapis.com';
-
-      const res = await fetch(url, {
+      const res = await fetch('/api/chat', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': key
-        },
-        body: JSON.stringify({
-          contents: [{ role: 'user', parts: [{ text: `Rolun: ${bot.system_prompt}\nSoru: ${q}` }] }]
-        })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: q, systemPrompt: bot.system_prompt })
       });
       const data = await res.json();
-      const yanit = data?.candidates?.at(0)?.content?.parts?.at(0)?.text || ('Hata: ' + (data?.error?.message || 'Yanit alinamadi'));
-      setMsgs(p => [...p, { r: 'u', t: q }, { r: 'a', t: `[x402 Odeme Onayli: ${bot.price_per_msg} Pi] ` + yanit }]);
+      setMsgs(p => [...p, { r: 'u', t: q }, { r: 'a', t: `[x402 Odeme Onayli: ${bot.price_per_msg} Pi] ` + data.reply }]);
     } catch (e) {
       setMsgs(p => [...p, { r: 'u', t: q }, { r: 'a', t: '⚠️ Hata: ' + e.message }]);
     }
