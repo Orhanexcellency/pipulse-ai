@@ -15,7 +15,19 @@ export default function Home() {
   const [txs, setTxs] = useState([{ t: 'Referans & Hosgeldin Bonusu', a: '+0.50 Pi', c: '#4ade80' }]);
   const [form, setForm] = useState({ name: '', description: '', system_prompt: '', price: 0.22 });
 
-  useEffect(() => { getBots(); }, []);
+  useEffect(() => {
+    getBots();
+    const sBal = localStorage.getItem('pp_bal');
+    const sTxs = localStorage.getItem('pp_txs');
+    if (sBal !== null) setBal(Number(sBal));
+    if (sTxs) try { setTxs(JSON.parse(sTxs)); } catch (e) {}
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('pp_bal', String(bal));
+    localStorage.setItem('pp_txs', JSON.stringify(txs));
+  }, [bal, txs]);
+
   const getBots = async () => { const { data } = await supabase.from('ai_agents').select('*').order('created_at', { ascending: false }); if (data?.length) setAgents(data); };
   const login = () => setUser({ uid: 'pioneer-pro-user', username: 'PioneerPro' });
 
