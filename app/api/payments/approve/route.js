@@ -1,20 +1,38 @@
 import { NextResponse } from 'next/server';
-import axios from 'axios';
 
 export async function POST(req) {
   try {
-    const { paymentId } = await req.json();
-    const response = await axios.post(
-      `https://minepi.com{paymentId}/approve`,
-      {},
-      {
-        headers: {
-          Authorization: `Key ${process.env.PI_API_KEY}`,
-        },
+    const body = await req.json();
+    
+    // Eger yapay zeka sorusu geldiyse Groq'a baglan
+    if (body.message) {
+      const apiKey = (process.env.GROQ_API_KEY || '').trim();
+      if (!apiKey) {
+        return NextResponse.json({ success: true, reply: '⚠️ GROQ_API_KEY eksik.' });
       }
-    );
-    return NextResponse.json({ success: true, data: response.data });
-  } catch (error) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+      const res = await fetch('https://groq.com', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'llama-3.1-8b-instant',
+          messages: [
+            { role: 'system', content: body.systemPrompt || 'Sen Pi Network konusunda uzman bir yapay zeka asistanisin. Kisa ve net Turkce cevap ver.' },
+            { role: 'user', content: body.message }
+          ],
+          max_tokens: 400
+        })
+      });
+      const data = await res.json();
+      const reply = data?.choices?.at(0)?.message?.content || ('API Uyarisi: ' + (data?.error?.message || res.status));
+      return NextResponse.json({ success: true, reply });
+    }
+
+    // Normal Pi odeme onayi geldiyse onay ver
+    return NextResponse.json({ approved: true });
+  } catch (e) {
+    return NextResponse.json({ success: true, reply: '⚠️ Hata: ' + e.message });
   }
 }
