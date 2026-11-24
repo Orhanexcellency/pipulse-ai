@@ -3,8 +3,8 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 
 const BOTS = [
-  { id: '1', creator_username: 'PiPulse', name: 'Pi Uzmani', description: 'Pi Network ve hackathon asistani.', system_prompt: 'Sen Pi uzmanisin.', price_per_msg: 0.01 },
-  { id: '2', creator_username: 'PiPulse', name: 'Ingilizce Kocu', description: 'Ingilizce pratik ogretmeni.', system_prompt: 'Sen Ingilizce ogretmenisin.', price_per_msg: 0.01 }
+  { id: '1', creator_username: 'PiPulse', name: 'Pi Uzmani', description: 'Pi Network ve hackathon asistani.', system_prompt: 'Sen Pi Network konusunda uzman bir yapay zeka asistanisin. Kisa ve net Turkce cevap ver.', price_per_msg: 0.01 },
+  { id: '2', creator_username: 'PiPulse', name: 'Ingilizce Kocu', description: 'Ingilizce pratik ogretmeni.', system_prompt: 'Sen sabirli bir Ingilizce ogretmenisin.', price_per_msg: 0.01 }
 ];
 
 export default function Home() {
@@ -33,15 +33,26 @@ export default function Home() {
     if (!user) return alert('Once sag ustten Pi ile Giris yapin!');
     const q = txt; setTxt(''); setBusy(true);
     try {
-      const res = await fetch('/api/chat', {
+      const key = (process.env.NEXT_PUBLIC_GEMINI_API_KEY || '').trim();
+      const url = key.startsWith('AQ.')
+        ? 'https://googleapis.com'
+        : 'https://googleapis.com';
+
+      const res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: q, systemPrompt: bot.system_prompt })
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': key
+        },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: `Rolun: ${bot.system_prompt}\nSoru: ${q}` }] }]
+        })
       });
       const data = await res.json();
-      setMsgs(p => [...p, { r: 'u', t: q }, { r: 'a', t: `[x402 Odeme Onayli: ${bot.price_per_msg} Pi] ` + data.reply }]);
+      const yanit = data?.candidates?.at(0)?.content?.parts?.at(0)?.text || ('Hata: ' + (data?.error?.message || 'Yanit alinamadi'));
+      setMsgs(p => [...p, { r: 'u', t: q }, { r: 'a', t: `[x402 Odeme Onayli: ${bot.price_per_msg} Pi] ` + yanit }]);
     } catch (e) {
-      setMsgs(p => [...p, { r: 'u', t: q }, { r: 'a', t: `[x402 Odeme Onayli: ${bot.price_per_msg} Pi] ⚡ Talebiniz isleme alindi.` }]);
+      setMsgs(p => [...p, { r: 'u', t: q }, { r: 'a', t: '⚠️ Hata: ' + e.message }]);
     }
     setBusy(false);
   };
