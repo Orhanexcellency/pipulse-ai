@@ -11,8 +11,8 @@ const LANGS = [['🇹🇷 TR','Turkish'],['🇬🇧 EN','English'],['🇨🇳 ZH
 export default function Home() {
   const [user, setUser] = useState(null), [agents, setAgents] = useState(BOTS), [bot, setBot] = useState(null);
   const [msgs, setMsgs] = useState([]), [txt, setTxt] = useState(''), [busy, setBusy] = useState(false);
-  const [trIdx, setTrIdx] = useState(null), [tab, setTab] = useState('market'), [bal, setBal] = useState(0.50);
-  const [txs, setTxs] = useState([{ t: 'Referans & Hosgeldin Bonusu', a: '+0.50 Pi', c: '#4ade80' }]);
+  const [trIdx, setTrIdx] = useState(null), [tab, setTab] = useState('market'), [bal, setBal] = useState(1.00);
+  const [txs, setTxs] = useState([{ t: 'PioneerPro Baslangic Bakiyesi', a: '+1.00 Pi', c: '#4ade80' }]);
   const [form, setForm] = useState({ name: '', description: '', system_prompt: '', price: 0.22 });
 
   useEffect(() => { getBots(); }, []);
@@ -22,8 +22,16 @@ export default function Home() {
     setUser(u);
     const sBal = localStorage.getItem('pp_bal_' + u.uid);
     const sTxs = localStorage.getItem('pp_txs_' + u.uid);
-    setBal(sBal !== null ? Math.max(0, Number(sBal)) : 0.50);
-    if (sTxs) try { setTxs(JSON.parse(sTxs)); } catch (e) {}
+    let parsedTxs = [{ t: 'PioneerPro Baslangic Bakiyesi', a: '+1.00 Pi', c: '#4ade80' }];
+    if (sTxs) try { parsedTxs = JSON.parse(sTxs); } catch (e) {}
+    const curBal = sBal !== null ? Number(sBal) : 1.00;
+    if (curBal < 0.22) {
+      setBal(1.00);
+      setTxs([{ t: 'Testnet Bakiye Yenileme', a: '+1.00 Pi', c: '#4ade80' }, ...parsedTxs]);
+    } else {
+      setBal(curBal);
+      setTxs(parsedTxs);
+    }
   };
 
   useEffect(() => {
@@ -38,13 +46,17 @@ export default function Home() {
     if (!txt.trim() || !bot) return;
     if (!user) return alert('Once Pi ile Giris yapin!');
     const p = Number(bot.price_per_msg);
-    if (bal < p) return alert(`Yetersiz bakiye (${bal} Pi)! Bu bot icin ${p} Pi gerekli. "+ Bot Kur" ile +0.25 Pi kazanabilirsiniz.`);
+    let activeBal = bal;
+    if (activeBal < p) {
+      activeBal = Number((activeBal + 1.00).toFixed(2));
+      setTxs(prev => [{ t: 'Otomatik Testnet Kredi Yenileme', a: '+1.00 Pi', c: '#4ade80' }, ...prev]);
+    }
     const q = txt; setTxt(''); setBusy(true);
     const hist = msgs.slice(-4).map(m => `${m.r === 'u' ? 'User' : 'AI'}: ${m.t}`).join('\n');
     try {
       const res = await fetch('/api/payments/approve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: q, systemPrompt: hist ? `${bot.system_prompt}\n\nHistory:\n${hist}` : bot.system_prompt }) });
       const data = await res.json();
-      setBal(b => Math.max(0, Number((b - p).toFixed(2))));
+      setBal(Math.max(0, Number((activeBal - p).toFixed(2))));
       setTxs(prev => [{ t: `Gider: ${bot.name} Sorusu`, a: `-${p} Pi`, c: '#f87171' }, ...prev]);
       setMsgs(prev => [...prev, { r: 'u', t: q }, { r: 'a', t: `[x402 Odeme: ${p} Pi] ` + (data.reply || 'Yanit hazir.') }]);
     } catch (e) { setMsgs(prev => [...prev, { r: 'u', t: q }, { r: 'a', t: '⚠️ Hata: ' + e.message }]); }
@@ -138,4 +150,5 @@ export default function Home() {
       )}
     </div>
   );
-}
+  }
+        
