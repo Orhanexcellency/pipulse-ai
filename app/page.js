@@ -15,31 +15,36 @@ export default function Home() {
   const [txs, setTxs] = useState([{ t: 'Referans & Hosgeldin Bonusu', a: '+0.50 Pi', c: '#4ade80' }]);
   const [form, setForm] = useState({ name: '', description: '', system_prompt: '', price: 0.22 });
 
-  useEffect(() => {
-    getBots();
-    const sBal = localStorage.getItem('pp_bal');
-    const sTxs = localStorage.getItem('pp_txs');
-    if (sBal !== null) setBal(Number(sBal));
+  useEffect(() => { getBots(); }, []);
+
+  const login = () => {
+    const u = { uid: 'pioneer-pro-user', username: 'PioneerPro' };
+    setUser(u);
+    const sBal = localStorage.getItem('pp_bal_' + u.uid);
+    const sTxs = localStorage.getItem('pp_txs_' + u.uid);
+    setBal(sBal !== null ? Math.max(0, Number(sBal)) : 0.50);
     if (sTxs) try { setTxs(JSON.parse(sTxs)); } catch (e) {}
-  }, []);
+  };
 
   useEffect(() => {
-    localStorage.setItem('pp_bal', String(bal));
-    localStorage.setItem('pp_txs', JSON.stringify(txs));
-  }, [bal, txs]);
+    if (!user) return;
+    localStorage.setItem('pp_bal_' + user.uid, String(Math.max(0, bal)));
+    localStorage.setItem('pp_txs_' + user.uid, JSON.stringify(txs));
+  }, [bal, txs, user]);
 
   const getBots = async () => { const { data } = await supabase.from('ai_agents').select('*').order('created_at', { ascending: false }); if (data?.length) setAgents(data); };
-  const login = () => setUser({ uid: 'pioneer-pro-user', username: 'PioneerPro' });
 
   const send = async () => {
-    if (!txt.trim() || !bot) return; if (!user) return alert('Once Pi ile Giris yapin!');
+    if (!txt.trim() || !bot) return;
+    if (!user) return alert('Once Pi ile Giris yapin!');
+    const p = Number(bot.price_per_msg);
+    if (bal < p) return alert(`Yetersiz bakiye (${bal} Pi)! Bu bot icin ${p} Pi gerekli. "+ Bot Kur" ile +0.25 Pi kazanabilirsiniz.`);
     const q = txt; setTxt(''); setBusy(true);
     const hist = msgs.slice(-4).map(m => `${m.r === 'u' ? 'User' : 'AI'}: ${m.t}`).join('\n');
     try {
       const res = await fetch('/api/payments/approve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: q, systemPrompt: hist ? `${bot.system_prompt}\n\nHistory:\n${hist}` : bot.system_prompt }) });
       const data = await res.json();
-      const p = Number(bot.price_per_msg);
-      setBal(b => Number((b - p).toFixed(2)));
+      setBal(b => Math.max(0, Number((b - p).toFixed(2))));
       setTxs(prev => [{ t: `Gider: ${bot.name} Sorusu`, a: `-${p} Pi`, c: '#f87171' }, ...prev]);
       setMsgs(prev => [...prev, { r: 'u', t: q }, { r: 'a', t: `[x402 Odeme: ${p} Pi] ` + (data.reply || 'Yanit hazir.') }]);
     } catch (e) { setMsgs(prev => [...prev, { r: 'u', t: q }, { r: 'a', t: '⚠️ Hata: ' + e.message }]); }
@@ -65,14 +70,15 @@ export default function Home() {
   };
 
   const withdraw = () => {
+    if (!user) return alert('Once Pi ile Giris yapin!');
     if (bal <= 0) return alert('Cekilebilir bakiye bulunmuyor.');
-    alert(`${bal} Pi tutarindaki kazanciniz @${user?.username || 'Pioneer'} Pi Cuzdaniniza aktarildi!`);
+    alert(`${bal} Pi tutarindaki kazanciniz @${user.username} Pi Cuzdaniniza aktarildi!`);
     setTxs(p => [{ t: 'Pi Cuzdana Cekim (Mainnet)', a: `-${bal} Pi`, c: '#f5b041' }, ...p]);
     setBal(0);
   };
 
   const delBot = async (e, id) => { e.stopPropagation(); if (confirm('Silinsin mi?')) { await supabase.from('ai_agents').delete().eq('id', id); getBots(); } };
-  const refUrl = 'https://vercel.app' + (user?.username || 'Pioneer');
+  const refUrl = 'https://pipulseai' + '.vercel.app/?ref=' + (user?.username || 'Pioneer');
 
   return (
     <div style={{ maxWidth: 500, margin: '0 auto', padding: 14 }}>
@@ -83,9 +89,9 @@ export default function Home() {
       <div style={{ display: 'flex', gap: 6, margin: '12px 0' }}>
         <button onClick={() => { setBot(null); setTab('market'); }} style={{ flex: 1, padding: 9, background: tab === 'market' ? '#4a3578' : '#1e1633', color: '#fff', border: 'none', borderRadius: 8, fontSize: 12 }}>🤖 Pazar</button>
         <button onClick={() => { setBot(null); setTab('create'); }} style={{ flex: 1, padding: 9, background: tab === 'create' ? '#7d3c98' : '#1e1633', color: '#fff', border: 'none', borderRadius: 8, fontSize: 12 }}>+ Bot Kur</button>
-        <button onClick={() => { setBot(null); setTab('wallet'); }} style={{ flex: 1, padding: 9, background: tab === 'wallet' ? '#1e4620' : '#1e1633', color: '#4ade80', border: 'none', borderRadius: 8, fontSize: 12 }}>💰 Cuzdan ({bal} Pi)</button>
+        <button onClick={() => { if (!user) return alert('Once Pi ile Giris yapin!'); setBot(null); setTab('wallet'); }} style={{ flex: 1, padding: 9, background: tab === 'wallet' ? '#1e4620' : '#1e1633', color: '#4ade80', border: 'none', borderRadius: 8, fontSize: 12 }}>{user ? `💰 Cuzdan (${bal} Pi)` : '💰 Cuzdan'}</button>
       </div>
-      {tab === 'wallet' && (
+      {tab === 'wallet' && user && (
         <div style={{ background: '#1a142e', padding: 14, borderRadius: 12, border: '1px solid #4a3578' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#0f0c29', padding: 12, borderRadius: 10, marginBottom: 12 }}>
             <div><small style={{ color: '#999' }}>Cekilebilir Bakiye</small><div style={{ fontSize: 20, fontWeight: 'bold', color: '#4ade80' }}>{bal} Pi</div></div>
