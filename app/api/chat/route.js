@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+export const runtime = 'edge';
+
 export async function POST(req) {
   try {
     const { message, systemPrompt } = await req.json();
@@ -13,9 +15,7 @@ export async function POST(req) {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (compatible; PiPulseAI/1.0)'
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         model: 'llama-3.1-8b-instant',
@@ -27,12 +27,7 @@ export async function POST(req) {
       })
     });
 
-    const raw = await res.text();
-    if (!raw) {
-      return NextResponse.json({ success: true, reply: `⚠️ Bos yanit (HTTP ${res.status}).` });
-    }
-
-    const data = JSON.parse(raw);
+    const data = await res.json();
     if (!res.ok) {
       return NextResponse.json({ success: true, reply: '⚠️ API Uyarisi: ' + (data?.error?.message || res.status) });
     }
