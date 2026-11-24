@@ -9,10 +9,11 @@ export async function POST(req) {
 
     const orKey = (process.env.OPENROUTER_API_KEY || '').trim();
     if (!orKey) {
-      return NextResponse.json({ success: true, reply: '⚠️ Vercel ayarlarinda OPENROUTER_API_KEY eksik.' });
+      return NextResponse.json({ success: true, reply: '⚠️ OPENROUTER_API_KEY eksik.' });
     }
 
-    const res = await fetch('https://openrouter.ai', {
+    const apiUrl = 'https://openrouter.ai' + '/api/v1/chat/completions';
+    const res = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${orKey}`,
@@ -37,7 +38,7 @@ export async function POST(req) {
 
     return NextResponse.json({
       success: true,
-      reply: `⚠️ Uyarisi (${res.status}): ` + (data?.error?.message || 'Yanit alinamadi')
+      reply: `⚠️ OpenRouter (${res.status}): ` + (data?.error?.message || 'Yanit alinamadi')
     });
   } catch (err) {
     return NextResponse.json({ success: true, reply: '⚠️ Sistem: ' + err.message });
