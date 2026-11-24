@@ -33,31 +33,22 @@ export default function Home() {
     if (!user) return alert('Once sag ustten Pi ile Giris yapin!');
     const q = txt; setTxt(''); setBusy(true);
 
-    let yanit = '';
     try {
-      const apiUrl = window.location.origin + '/api/chat';
-      const res = await fetch(apiUrl, {
+      const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: q, systemPrompt: bot.system_prompt })
       });
-      const data = await res.json();
-      yanit = data.reply || '';
-    } catch (e) {
-      yanit = '';
-    }
-
-    if (!yanit || yanit.includes('Hata')) {
+      const text = await res.text();
+      let yanit = text;
       try {
-        const prompt = encodeURIComponent(`Rol: ${bot.system_prompt}. Soru: ${q}. Turkce kisa cevap ver.`);
-        const r2 = await fetch(`https://pollinations.ai{prompt}`);
-        yanit = await r2.text();
-      } catch (e2) {
-        yanit = `⚡ [${bot.name}]: "${q}" sorunuz PiPulse AI tarafindan analiz edildi. Pi Network blokzinciri uzerinde bu islem basariyla dogrulandi.`;
-      }
+        const data = JSON.parse(text);
+        yanit = data.reply || text;
+      } catch (e) {}
+      setMsgs(p => [...p, { r: 'u', t: q }, { r: 'a', t: `[x402 Odeme Onayli: ${bot.price_per_msg} Pi] ` + yanit }]);
+    } catch (err) {
+      setMsgs(p => [...p, { r: 'u', t: q }, { r: 'a', t: '⚠️ Ag Hatasi: ' + err.message }]);
     }
-
-    setMsgs(p => [...p, { r: 'u', t: q }, { r: 'a', t: `[x402 Odeme Onayli: ${bot.price_per_msg} Pi] ` + yanit }]);
     setBusy(false);
   };
 
