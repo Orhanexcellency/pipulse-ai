@@ -10,7 +10,7 @@ const LANGS = [['🇹🇷 TR','Turkish'],['🇬🇧 EN','English'],['🇨🇳 ZH
 
 export default function Home() {
   const [user, setUser] = useState(null), [agents, setAgents] = useState(BOTS), [bot, setBot] = useState(null);
-  const [msgs, setMsgs] = useState([]), [txt, setTxt] = useState(''), [busy, setBusy] = useState(false);
+  const [msgs, setMsgs] = useState([]), [txt, setTxt] = useState(''), [search, setSearch] = useState(''), [busy, setBusy] = useState(false);
   const [trIdx, setTrIdx] = useState(null), [tab, setTab] = useState('market'), [bal, setBal] = useState(1.00);
   const [txs, setTxs] = useState([{ t: 'PioneerPro Baslangic Bakiyesi', a: '+1.00 Pi', c: '#4ade80' }]);
   const [form, setForm] = useState({ name: '', description: '', system_prompt: '', price: 0.22 });
@@ -20,18 +20,12 @@ export default function Home() {
   const login = () => {
     const u = { uid: 'pioneer-pro-user', username: 'PioneerPro' };
     setUser(u);
-    const sBal = localStorage.getItem('pp_bal_' + u.uid);
-    const sTxs = localStorage.getItem('pp_txs_' + u.uid);
+    const sBal = localStorage.getItem('pp_bal_' + u.uid), sTxs = localStorage.getItem('pp_txs_' + u.uid);
     let parsedTxs = [{ t: 'PioneerPro Baslangic Bakiyesi', a: '+1.00 Pi', c: '#4ade80' }];
     if (sTxs) try { parsedTxs = JSON.parse(sTxs); } catch (e) {}
     const curBal = sBal !== null ? Number(sBal) : 1.00;
-    if (curBal < 0.22) {
-      setBal(1.00);
-      setTxs([{ t: 'Testnet Bakiye Yenileme', a: '+1.00 Pi', c: '#4ade80' }, ...parsedTxs]);
-    } else {
-      setBal(curBal);
-      setTxs(parsedTxs);
-    }
+    if (curBal < 0.22) { setBal(1.00); setTxs([{ t: 'Testnet Bakiye Yenileme', a: '+1.00 Pi', c: '#4ade80' }, ...parsedTxs]); }
+    else { setBal(curBal); setTxs(parsedTxs); }
   };
 
   useEffect(() => {
@@ -47,10 +41,7 @@ export default function Home() {
     if (!user) return alert('Once Pi ile Giris yapin!');
     const p = Number(bot.price_per_msg);
     let activeBal = bal;
-    if (activeBal < p) {
-      activeBal = Number((activeBal + 1.00).toFixed(2));
-      setTxs(prev => [{ t: 'Otomatik Testnet Kredi Yenileme', a: '+1.00 Pi', c: '#4ade80' }, ...prev]);
-    }
+    if (activeBal < p) { activeBal = Number((activeBal + 1.00).toFixed(2)); setTxs(prev => [{ t: 'Otomatik Testnet Kredi Yenileme', a: '+1.00 Pi', c: '#4ade80' }, ...prev]); }
     const q = txt; setTxt(''); setBusy(true);
     const hist = msgs.slice(-4).map(m => `${m.r === 'u' ? 'User' : 'AI'}: ${m.t}`).join('\n');
     try {
@@ -91,6 +82,8 @@ export default function Home() {
 
   const delBot = async (e, id) => { e.stopPropagation(); if (confirm('Silinsin mi?')) { await supabase.from('ai_agents').delete().eq('id', id); getBots(); } };
   const refUrl = 'https://pipulseai' + '.vercel.app/?ref=' + (user?.username || 'Pioneer');
+  const sortedBots = [...agents].sort((a, b) => (a.creator_uid === 'guide' ? -1 : b.creator_uid === 'guide' ? 1 : 0));
+  const filteredBots = sortedBots.filter(b => (b.name + ' ' + b.description + ' ' + b.creator_username).toLowerCase().includes(search.toLowerCase()));
 
   return (
     <div style={{ maxWidth: 500, margin: '0 auto', padding: 14 }}>
@@ -99,7 +92,7 @@ export default function Home() {
         {user ? <span style={{ background: '#2e1a47', padding: '5px 10px', borderRadius: 14, fontSize: 12 }}>@{user.username}</span> : <button onClick={login} style={{ background: '#f5b041', padding: '8px 14px', borderRadius: 8, border: 'none', fontWeight: 'bold' }}>Pi ile Giris</button>}
       </div>
       <div style={{ display: 'flex', gap: 6, margin: '12px 0' }}>
-        <button onClick={() => { setBot(null); setTab('market'); }} style={{ flex: 1, padding: 9, background: tab === 'market' ? '#4a3578' : '#1e1633', color: '#fff', border: 'none', borderRadius: 8, fontSize: 12 }}>🤖 Pazar</button>
+        <button onClick={() => { setBot(null); setTab('market'); }} style={{ flex: 1, padding: 9, background: tab === 'market' ? '#4a3578' : '#1e1633', color: '#fff', border: 'none', borderRadius: 8, fontSize: 12 }}>🤖 Pazar ({agents.length})</button>
         <button onClick={() => { setBot(null); setTab('create'); }} style={{ flex: 1, padding: 9, background: tab === 'create' ? '#7d3c98' : '#1e1633', color: '#fff', border: 'none', borderRadius: 8, fontSize: 12 }}>+ Bot Kur</button>
         <button onClick={() => { if (!user) return alert('Once Pi ile Giris yapin!'); setBot(null); setTab('wallet'); }} style={{ flex: 1, padding: 9, background: tab === 'wallet' ? '#1e4620' : '#1e1633', color: '#4ade80', border: 'none', borderRadius: 8, fontSize: 12 }}>{user ? `💰 Cuzdan (${bal} Pi)` : '💰 Cuzdan'}</button>
       </div>
@@ -127,12 +120,31 @@ export default function Home() {
           <button type="submit" disabled={busy} style={{ background: '#f5b041', padding: 13, borderRadius: 8, fontWeight: 'bold', border: 'none' }}>{busy ? 'Kaydediliyor...' : 'Yayinla (+0.25 Pi Gelir)'}</button>
         </form>
       )}
-      {tab === 'market' && !bot && agents.map(b => (
-        <div key={b.id} onClick={() => { setBot(b); setMsgs([]); }} style={{ background: '#1a142e', padding: 14, borderRadius: 12, marginBottom: 10, border: '1px solid #4a3578' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}><b style={{ color: '#f5b041' }}>{b.name}</b><div style={{ display: 'flex', gap: 6 }}><span style={{ background: '#2e1a47', padding: '2px 8px', borderRadius: 8, fontSize: 12 }}>{b.price_per_msg} Pi</span>{user && b.creator_uid === user.uid && <button onClick={e => delBot(e, b.id)} style={{ background: '#7f1d1d', color: '#fca5a5', border: 'none', padding: '2px 8px', borderRadius: 6, fontSize: 11 }}>Sil</button>}</div></div>
-          <p style={{ fontSize: 13, margin: '6px 0' }}>{b.description}</p><small style={{ color: '#999' }}>@{b.creator_username}</small>
+      {tab === 'market' && !bot && (
+        <div>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Bot veya uzmanlik ara..." style={{ flex: 1, padding: '10px 12px', borderRadius: 10, background: '#1a142e', color: '#fff', border: '1px solid #4a3578', fontSize: 13 }} />
+            {search && <button onClick={() => setSearch('')} style={{ background: '#4a3578', color: '#fff', border: 'none', borderRadius: 10, padding: '0 12px', fontWeight: 'bold' }}>✕</button>}
+          </div>
+          {filteredBots.map(b => {
+            const isG = b.creator_uid === 'guide';
+            return (
+              <div key={b.id} onClick={() => { setBot(b); setMsgs([]); }} style={{ background: isG ? 'linear-gradient(135deg, #134e4a, #1e1b4b)' : '#1a142e', padding: 14, borderRadius: 12, marginBottom: 10, border: isG ? '2px solid #2dd4bf' : '1px solid #4a3578' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <b style={{ color: isG ? '#5eead4' : '#f5b041' }}>{b.name}</b>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {isG && <span style={{ background: '#0d9488', color: '#fff', padding: '2px 7px', borderRadius: 6, fontSize: 10, fontWeight: 'bold' }}>📌 REHBER</span>}
+                    <span style={{ background: '#2e1a47', padding: '2px 8px', borderRadius: 8, fontSize: 12 }}>{b.price_per_msg} Pi</span>
+                    {user && b.creator_uid === user.uid && <button onClick={e => delBot(e, b.id)} style={{ background: '#7f1d1d', color: '#fca5a5', border: 'none', padding: '2px 8px', borderRadius: 6, fontSize: 11 }}>Sil</button>}
+                  </div>
+                </div>
+                <p style={{ fontSize: 13, margin: '6px 0', color: isG ? '#e2e8f0' : '#ddd' }}>{b.description}</p>
+                <small style={{ color: isG ? '#5eead4' : '#999' }}>@{b.creator_username}</small>
+              </div>
+            );
+          })}
         </div>
-      ))}
+      )}
       {bot && (
         <div style={{ background: '#1a142e', padding: 12, borderRadius: 12, border: '1px solid #4a3578' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}><b>{bot.name} <small style={{ color: '#4ade80' }}>● Hafiza</small></b><button onClick={() => setBot(null)} style={{ color: '#f5b041', background: 'none', border: 'none' }}>← Geri</button></div>
@@ -150,5 +162,5 @@ export default function Home() {
       )}
     </div>
   );
-  }
-        
+    }
+          
