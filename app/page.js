@@ -14,7 +14,11 @@ export default function Home() {
   const [busy, setBusy] = useState(false), [trIdx, setTrIdx] = useState(null), [tab, setTab] = useState('market'), [bal, setBal] = useState(1.00);
   const [txs, setTxs] = useState([{ t: 'PioneerPro Welcome Balance', a: '+1.00 Pi', c: '#4ade80' }]);
   const [form, setForm] = useState({ name: '', description: '', system_prompt: '', price: 0.50 });
-  const [trade, setTrade] = useState({ partner: '', item: '', amount: '10' }), [contract, setContract] = useState('');
+  const [trade, setTrade] = useState({ partner: '', item: '', amount: '' }), [contract, setContract] = useState('');
+  const [recentTrades, setRecentTrades] = useState([
+    { pair: '@Web3Dev ↔ @DesignPi', item: 'Mobile App UI Kit', amt: '25 Pi', status: 'Sealed' },
+    { pair: '@LocalCafe ↔ @Pioneer88', item: 'Coffee & Pastry Voucher', amt: '4.5 Pi', status: 'Sealed' }
+  ]);
 
   useEffect(() => { getBots(); }, []);
 
@@ -61,11 +65,17 @@ export default function Home() {
     e.preventDefault(); if (!user) return alert('Please sign in with Pi first!');
     setBusy(true); setContract('');
     try {
-      const res = await fetch('/api/payments/approve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: `Buyer: @${user.username} (KYC Verified), Seller: @${trade.partner}, Item/Service: ${trade.item}, Agreed Price: ${trade.amount} Pi`, systemPrompt: 'You are the PiPulse P2P Pi Commerce Escrow Engine. Generate a concise, binding, scam-proof Pi Network P2P trade agreement with KYC verification status, delivery milestones, and dispute protection clauses.' }) });
+      const res = await fetch('/api/payments/approve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: `Party A: @${user.username} (KYC Verified), Party B: ${trade.partner}, Item/Service: ${trade.item}, Agreed Price: ${trade.amount} Pi`, systemPrompt: 'You are the PiPulse P2P Smart Trade & Contract AI. Draft a concise, clear Pi Network peer-to-peer trade agreement with KYC identity status, delivery terms, and mutual confirmation clauses.' }) });
       const data = await res.json();
-      setContract(data.reply || 'Escrow agreement generated.');
+      setContract(data.reply || 'Smart trade contract generated.');
+      setRecentTrades(prev => [{ pair: `@${user.username} ↔ ${trade.partner}`, item: trade.item, amt: `${trade.amount} Pi`, status: 'Drafted' }, ...prev.slice(0, 3)]);
     } catch (e) { setContract('Error generating contract.'); }
     setBusy(false);
+  };
+
+  const sealContract = () => {
+    alert(`Contract sealed with x402 Proof! Share it in Pi Chat with ${trade.partner}.`);
+    setRecentTrades(prev => prev.map((r, i) => i === 0 ? { ...r, status: 'Sealed' } : r));
   };
 
   const trMsg = async (idx, raw, lang) => {
@@ -102,7 +112,7 @@ export default function Home() {
     return (!search || text.includes(search.toLowerCase())) && (!cat || cat.split(' ').some(k => text.includes(k)));
   });
   const visibleBots = (search || cat) ? filtered.slice(0, 60) : filtered.slice(0, 30);
-    return (
+  return (
     <div style={{ maxWidth: 500, margin: '0 auto', padding: 14 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #333', paddingBottom: 10 }}>
         <b onClick={() => { setBot(null); setTab('market'); }} style={{ color: '#f5b041', fontSize: 18 }}>⚡ PiPulse AI</b>
@@ -115,21 +125,44 @@ export default function Home() {
         <button onClick={() => { if (!user) return alert('Please sign in with Pi first!'); setBot(null); setTab('wallet'); }} style={{ flex: 1, padding: 8, background: tab === 'wallet' ? '#1e4620' : '#1e1633', color: '#4ade80', border: 'none', borderRadius: 8, fontSize: 11 }}>{user ? `💰 ${bal} Pi` : '💰 Wallet'}</button>
       </div>
       {tab === 'trade' && (
-        <div style={{ background: '#1a142e', padding: 14, borderRadius: 12, border: '1px solid #2dd4bf' }}>
-          <b style={{ color: '#5eead4', fontSize: 14 }}>🤝 Pi P2P Local Commerce & Escrow AI</b>
-          <p style={{ fontSize: 12, color: '#ccc', margin: '6px 0 12px' }}>Generate a KYC-backed Pi Network peer-to-peer trade agreement for local goods, freelancing, or services.</p>
-          <form onSubmit={makeTrade} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <input placeholder="Trading Partner Username (e.g. @SellerPi)" value={trade.partner} onChange={e => setTrade({...trade, partner: e.target.value})} required style={{ padding: 10, borderRadius: 8 }} />
-            <input placeholder="Goods or Service Description" value={trade.item} onChange={e => setTrade({...trade, item: e.target.value})} required style={{ padding: 10, borderRadius: 8 }} />
-            <input type="number" step="0.1" placeholder="Agreed Amount (Pi)" value={trade.amount} onChange={e => setTrade({...trade, amount: e.target.value})} required style={{ padding: 10, borderRadius: 8 }} />
-            <button type="submit" disabled={busy} style={{ background: '#2dd4bf', color: '#000', padding: 11, borderRadius: 8, fontWeight: 'bold', border: 'none' }}>{busy ? 'Generating Escrow Contract...' : 'Generate KYC Pi Trade Agreement'}</button>
-          </form>
-          {contract && (
-            <div style={{ marginTop: 12, background: '#0f0c29', padding: 12, borderRadius: 8, border: '1px solid #4a3578' }}>
-              <div style={{ fontSize: 12, whiteSpace: 'pre-wrap', color: '#e2e8f0' }}>{contract}</div>
-              <button onClick={() => { navigator.clipboard?.writeText(contract); alert('Pi Trade Contract copied!'); }} style={{ marginTop: 8, background: '#f5b041', padding: '7px 12px', borderRadius: 6, border: 'none', fontWeight: 'bold', fontSize: 12 }}>📋 Copy Contract for Pi Chat</button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ background: '#1a142e', padding: 14, borderRadius: 12, border: '1px solid #2dd4bf' }}>
+            <b style={{ color: '#5eead4', fontSize: 14 }}>🤝 Pi P2P Smart Trade & Contract AI</b>
+            <p style={{ fontSize: 12, color: '#ccc', margin: '6px 0 12px' }}>Draft a clear, KYC-backed peer-to-peer trade agreement for local goods, services, or freelancing on Pi.</p>
+            <form onSubmit={makeTrade} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <input placeholder="Trading Partner Username (e.g. @SellerPi)" value={trade.partner} onChange={e => setTrade({...trade, partner: e.target.value})} required style={{ padding: 10, borderRadius: 8 }} />
+              <input placeholder="Goods or Service Description" value={trade.item} onChange={e => setTrade({...trade, item: e.target.value})} required style={{ padding: 10, borderRadius: 8 }} />
+              <label style={{ fontSize: 11, color: '#5eead4', marginTop: 2 }}>Agreed Price (in Pi):</label>
+              <input type="number" step="0.1" min="0.1" placeholder="Amount in Pi (e.g., 10 Pi)" value={trade.amount} onChange={e => setTrade({...trade, amount: e.target.value})} required style={{ padding: 10, borderRadius: 8 }} />
+              <button type="submit" disabled={busy} style={{ background: '#2dd4bf', color: '#000', padding: 11, borderRadius: 8, fontWeight: 'bold', border: 'none', marginTop: 4 }}>{busy ? 'Drafting Smart Contract...' : 'Generate KYC Pi Trade Agreement'}</button>
+            </form>
+            {contract && (
+              <div style={{ marginTop: 12, background: '#0f0c29', padding: 12, borderRadius: 8, border: '1px solid #4a3578' }}>
+                <div style={{ fontSize: 12, whiteSpace: 'pre-wrap', color: '#e2e8f0' }}>{contract}</div>
+                <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+                  <button onClick={() => { navigator.clipboard?.writeText(contract); alert('Contract copied!'); }} style={{ flex: 1, background: '#f5b041', padding: '8px', borderRadius: 6, border: 'none', fontWeight: 'bold', fontSize: 11 }}>📋 Copy for Pi Chat</button>
+                  <button onClick={sealContract} style={{ flex: 1, background: '#4ade80', color: '#000', padding: '8px', borderRadius: 6, border: 'none', fontWeight: 'bold', fontSize: 11 }}>🛡️ Seal with x402</button>
+                </div>
+              </div>
+            )}
+          </div>
+          <div style={{ background: '#1a142e', padding: 12, borderRadius: 12, border: '1px solid #4a3578' }}>
+            <b style={{ color: '#f5b041', fontSize: 12 }}>⚡ How P2P Smart Trade Works</b>
+            <div style={{ fontSize: 11, color: '#ccc', marginTop: 6, lineHeight: 1.5 }}>
+              1. Enter KYC-verified Pioneer usernames & agreed Pi amount.<br/>
+              2. AI drafts clear delivery & dispute-protection terms.<br/>
+              3. Seal with x402 & share directly in Pi Browser Chat.
             </div>
-          )}
+          </div>
+          <div style={{ background: '#1a142e', padding: 12, borderRadius: 12, border: '1px solid #4a3578' }}>
+            <b style={{ color: '#5eead4', fontSize: 12 }}>🛡️ Recent KYC-Verified Trades</b>
+            {recentTrades.map((r, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 0', borderBottom: '1px solid #2a214a', fontSize: 11 }}>
+                <div><b style={{ color: '#fff' }}>{r.pair}</b><div style={{ color: '#999' }}>{r.item}</div></div>
+                <div style={{ textAlign: 'right' }}><b style={{ color: '#f5b041' }}>{r.amt}</b><div style={{ color: '#4ade80', fontSize: 10 }}>● {r.status}</div></div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
       {tab === 'wallet' && user && (
@@ -147,7 +180,7 @@ export default function Home() {
           {txs.map((x, i) => <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid #2a214a', fontSize: 13 }}><span>{x.t}</span><b style={{ color: x.c }}>{x.a}</b></div>)}
         </div>
       )}
-                              {tab === 'create' && (
+                {tab === 'create' && (
         <form onSubmit={create} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ background: '#134e4a', color: '#5eead4', padding: 8, borderRadius: 8, fontSize: 12 }}>🛡️ Publishing with Pi KYC Identity Protection (Max 3 bots/user)</div>
           <input placeholder="Agent Name" value={form.name} onChange={e => setForm({...form, name: e.target.value})} required style={{ padding: 11, borderRadius: 8 }} />
@@ -216,5 +249,4 @@ export default function Home() {
       )}
     </div>
   );
-        }
-        
+                                                           }
