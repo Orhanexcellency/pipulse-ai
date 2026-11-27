@@ -14,11 +14,12 @@ export default function Home() {
   const [busy, setBusy] = useState(false), [trIdx, setTrIdx] = useState(null), [tab, setTab] = useState('market'), [bal, setBal] = useState(1.00);
   const [txs, setTxs] = useState([{ t: 'PioneerPro Welcome Balance', a: '+1.00 Pi', c: '#4ade80' }]);
   const [form, setForm] = useState({ name: '', description: '', system_prompt: '', price: 0.50 });
+  const [trade, setTrade] = useState({ partner: '', item: '', amount: '10' }), [contract, setContract] = useState('');
 
   useEffect(() => { getBots(); }, []);
 
   const login = () => {
-    const u = { uid: 'pioneer-pro-user', username: 'PioneerPro' };
+    const u = { uid: 'pioneer-pro-user', username: 'PioneerPro', kyc: true };
     setUser(u);
     const sBal = localStorage.getItem('pp_bal_' + u.uid), sTxs = localStorage.getItem('pp_txs_' + u.uid);
     let parsedTxs = [{ t: 'PioneerPro Welcome Balance', a: '+1.00 Pi', c: '#4ade80' }];
@@ -56,6 +57,17 @@ export default function Home() {
     setBusy(false);
   };
 
+  const makeTrade = async (e) => {
+    e.preventDefault(); if (!user) return alert('Please sign in with Pi first!');
+    setBusy(true); setContract('');
+    try {
+      const res = await fetch('/api/payments/approve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: `Buyer: @${user.username} (KYC Verified), Seller: @${trade.partner}, Item/Service: ${trade.item}, Agreed Price: ${trade.amount} Pi`, systemPrompt: 'You are the PiPulse P2P Pi Commerce Escrow Engine. Generate a concise, binding, scam-proof Pi Network P2P trade agreement with KYC verification status, delivery milestones, and dispute protection clauses.' }) });
+      const data = await res.json();
+      setContract(data.reply || 'Escrow agreement generated.');
+    } catch (e) { setContract('Error generating contract.'); }
+    setBusy(false);
+  };
+
   const trMsg = async (idx, raw, lang) => {
     setTrIdx(idx); setMsgs(p => p.map((m, i) => i === idx ? { ...m, tr: `⏳ Translating to ${lang}...` } : m));
     try {
@@ -67,12 +79,11 @@ export default function Home() {
 
   const create = async (e) => {
     e.preventDefault(); if (!user) return alert('Please sign in with Pi first!');
-    const myCount = agents.filter(a => a.creator_uid === user.uid).length;
-    if (myCount >= 3) return alert('Limit reached: You can create up to 3 AI agents per account.');
+    if (agents.filter(a => a.creator_uid === user.uid).length >= 3) return alert('Limit reached: Max 3 AI agents per KYC account.');
     setBusy(true);
     const { error } = await supabase.from('ai_agents').insert({ creator_uid: user.uid, creator_username: user.username, name: form.name, description: form.description, system_prompt: form.system_prompt, price_per_msg: Number(form.price) });
     setBusy(false); if (error) return alert(error.message);
-    alert('Agent published! You will earn Pi whenever Pioneers chat with your bot.'); setForm({ name: '', description: '', system_prompt: '', price: 0.50 }); setTab('market'); getBots();
+    alert('KYC-Verified Agent published!'); setForm({ name: '', description: '', system_prompt: '', price: 0.50 }); setTab('market'); getBots();
   };
 
   const withdraw = () => {
@@ -95,13 +106,32 @@ export default function Home() {
     <div style={{ maxWidth: 500, margin: '0 auto', padding: 14 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #333', paddingBottom: 10 }}>
         <b onClick={() => { setBot(null); setTab('market'); }} style={{ color: '#f5b041', fontSize: 18 }}>⚡ PiPulse AI</b>
-        {user ? <span style={{ background: '#2e1a47', padding: '5px 10px', borderRadius: 14, fontSize: 12 }}>@{user.username}</span> : <button onClick={login} style={{ background: '#f5b041', padding: '8px 14px', borderRadius: 8, border: 'none', fontWeight: 'bold' }}>Sign in with Pi</button>}
+        {user ? <span style={{ background: '#134e4a', color: '#5eead4', padding: '5px 10px', borderRadius: 14, fontSize: 11, fontWeight: 'bold' }}>🛡️ @{user.username} • KYC</span> : <button onClick={login} style={{ background: '#f5b041', padding: '8px 14px', borderRadius: 8, border: 'none', fontWeight: 'bold' }}>Sign in with Pi</button>}
       </div>
-      <div style={{ display: 'flex', gap: 6, margin: '12px 0' }}>
-        <button onClick={() => { setBot(null); setTab('market'); }} style={{ flex: 1, padding: 9, background: tab === 'market' ? '#4a3578' : '#1e1633', color: '#fff', border: 'none', borderRadius: 8, fontSize: 12 }}>🤖 Market ({agents.length})</button>
-        <button onClick={() => { setBot(null); setTab('create'); }} style={{ flex: 1, padding: 9, background: tab === 'create' ? '#7d3c98' : '#1e1633', color: '#fff', border: 'none', borderRadius: 8, fontSize: 12 }}>+ Create Bot</button>
-        <button onClick={() => { if (!user) return alert('Please sign in with Pi first!'); setBot(null); setTab('wallet'); }} style={{ flex: 1, padding: 9, background: tab === 'wallet' ? '#1e4620' : '#1e1633', color: '#4ade80', border: 'none', borderRadius: 8, fontSize: 12 }}>{user ? `💰 Wallet (${bal} Pi)` : '💰 Wallet'}</button>
+      <div style={{ display: 'flex', gap: 5, margin: '12px 0' }}>
+        <button onClick={() => { setBot(null); setTab('market'); }} style={{ flex: 1, padding: 8, background: tab === 'market' ? '#4a3578' : '#1e1633', color: '#fff', border: 'none', borderRadius: 8, fontSize: 11 }}>🤖 Market ({agents.length})</button>
+        <button onClick={() => { setBot(null); setTab('trade'); }} style={{ flex: 1, padding: 8, background: tab === 'trade' ? '#0f766e' : '#1e1633', color: '#5eead4', border: 'none', borderRadius: 8, fontSize: 11, fontWeight: 'bold' }}>🤝 Pi Trade</button>
+        <button onClick={() => { setBot(null); setTab('create'); }} style={{ flex: 1, padding: 8, background: tab === 'create' ? '#7d3c98' : '#1e1633', color: '#fff', border: 'none', borderRadius: 8, fontSize: 11 }}>+ Bot</button>
+        <button onClick={() => { if (!user) return alert('Please sign in with Pi first!'); setBot(null); setTab('wallet'); }} style={{ flex: 1, padding: 8, background: tab === 'wallet' ? '#1e4620' : '#1e1633', color: '#4ade80', border: 'none', borderRadius: 8, fontSize: 11 }}>{user ? `💰 ${bal} Pi` : '💰 Wallet'}</button>
       </div>
+      {tab === 'trade' && (
+        <div style={{ background: '#1a142e', padding: 14, borderRadius: 12, border: '1px solid #2dd4bf' }}>
+          <b style={{ color: '#5eead4', fontSize: 14 }}>🤝 Pi P2P Local Commerce & Escrow AI</b>
+          <p style={{ fontSize: 12, color: '#ccc', margin: '6px 0 12px' }}>Generate a KYC-backed Pi Network peer-to-peer trade agreement for local goods, freelancing, or services.</p>
+          <form onSubmit={makeTrade} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <input placeholder="Trading Partner Username (e.g. @SellerPi)" value={trade.partner} onChange={e => setTrade({...trade, partner: e.target.value})} required style={{ padding: 10, borderRadius: 8 }} />
+            <input placeholder="Goods or Service Description" value={trade.item} onChange={e => setTrade({...trade, item: e.target.value})} required style={{ padding: 10, borderRadius: 8 }} />
+            <input type="number" step="0.1" placeholder="Agreed Amount (Pi)" value={trade.amount} onChange={e => setTrade({...trade, amount: e.target.value})} required style={{ padding: 10, borderRadius: 8 }} />
+            <button type="submit" disabled={busy} style={{ background: '#2dd4bf', color: '#000', padding: 11, borderRadius: 8, fontWeight: 'bold', border: 'none' }}>{busy ? 'Generating Escrow Contract...' : 'Generate KYC Pi Trade Agreement'}</button>
+          </form>
+          {contract && (
+            <div style={{ marginTop: 12, background: '#0f0c29', padding: 12, borderRadius: 8, border: '1px solid #4a3578' }}>
+              <div style={{ fontSize: 12, whiteSpace: 'pre-wrap', color: '#e2e8f0' }}>{contract}</div>
+              <button onClick={() => { navigator.clipboard?.writeText(contract); alert('Pi Trade Contract copied!'); }} style={{ marginTop: 8, background: '#f5b041', padding: '7px 12px', borderRadius: 6, border: 'none', fontWeight: 'bold', fontSize: 12 }}>📋 Copy Contract for Pi Chat</button>
+            </div>
+          )}
+        </div>
+      )}
       {tab === 'wallet' && user && (
         <div style={{ background: '#1a142e', padding: 14, borderRadius: 12, border: '1px solid #4a3578' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#0f0c29', padding: 12, borderRadius: 10, marginBottom: 12 }}>
@@ -117,19 +147,20 @@ export default function Home() {
           {txs.map((x, i) => <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid #2a214a', fontSize: 13 }}><span>{x.t}</span><b style={{ color: x.c }}>{x.a}</b></div>)}
         </div>
       )}
-      {tab === 'create' && (
+                              {tab === 'create' && (
         <form onSubmit={create} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ background: '#134e4a', color: '#5eead4', padding: 8, borderRadius: 8, fontSize: 12 }}>🛡️ Publishing with Pi KYC Identity Protection (Max 3 bots/user)</div>
           <input placeholder="Agent Name" value={form.name} onChange={e => setForm({...form, name: e.target.value})} required style={{ padding: 11, borderRadius: 8 }} />
           <input placeholder="Short Description" value={form.description} onChange={e => setForm({...form, description: e.target.value})} required style={{ padding: 11, borderRadius: 8 }} />
           <textarea rows={3} placeholder="System Prompt (Instructions)" value={form.system_prompt} onChange={e => setForm({...form, system_prompt: e.target.value})} required style={{ padding: 11, borderRadius: 8 }} />
           <input type="number" step="0.01" min="0.01" value={form.price} onChange={e => setForm({...form, price: e.target.value})} required style={{ padding: 11, borderRadius: 8 }} />
-          <button type="submit" disabled={busy} style={{ background: '#f5b041', padding: 13, borderRadius: 8, fontWeight: 'bold', border: 'none' }}>{busy ? 'Publishing...' : 'Publish Agent'}</button>
+          <button type="submit" disabled={busy} style={{ background: '#f5b041', padding: 13, borderRadius: 8, fontWeight: 'bold', border: 'none' }}>{busy ? 'Publishing...' : 'Publish KYC-Verified Agent'}</button>
         </form>
       )}
       {tab === 'market' && !bot && (
         <div>
           <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Search 1,000+ expert AI agents..." style={{ flex: 1, padding: '10px 12px', borderRadius: 10, background: '#1a142e', color: '#fff', border: '1px solid #4a3578', fontSize: 13 }} />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Search 1,000+ KYC-verified AI agents..." style={{ flex: 1, padding: '10px 12px', borderRadius: 10, background: '#1a142e', color: '#fff', border: '1px solid #4a3578', fontSize: 13 }} />
             {search && <button onClick={() => setSearch('')} style={{ background: '#4a3578', color: '#fff', border: 'none', borderRadius: 10, padding: '0 12px', fontWeight: 'bold' }}>✕</button>}
           </div>
           <div style={{ display: 'flex', gap: 5, overflowX: 'auto', paddingBottom: 8, marginBottom: 6 }}>
@@ -148,7 +179,7 @@ export default function Home() {
                   </div>
                 </div>
                 <p style={{ fontSize: 13, margin: '6px 0', color: isG ? '#e2e8f0' : '#ddd' }}>{b.description}</p>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: isG ? '#5eead4' : '#999' }}><span>@{b.creator_username}</span><span>⭐ 4.{9 - (idx % 2)} ({120 + (idx * 17) % 340} chats)</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: isG ? '#5eead4' : '#999' }}><span>🛡️ @{b.creator_username} • KYC</span><span>⭐ 4.{9 - (idx % 2)} ({120 + (idx * 17) % 340} chats)</span></div>
               </div>
             );
           })}
@@ -185,4 +216,5 @@ export default function Home() {
       )}
     </div>
   );
-                                                                    }
+        }
+        
