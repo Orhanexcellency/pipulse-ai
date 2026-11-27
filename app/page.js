@@ -65,14 +65,16 @@ export default function Home() {
     } catch (e) {} setTrIdx(null);
   };
 
-  const create = async (e) => {
-    e.preventDefault(); if (!user) return alert('Please sign in with Pi first!'); setBusy(true);
+    const create = async (e) => {
+    e.preventDefault(); if (!user) return alert('Please sign in with Pi first!');
+    const myCount = agents.filter(a => a.creator_uid === user.uid).length;
+    if (myCount >= 3) return alert('Limit reached: You can create up to 3 AI agents per account.');
+    setBusy(true);
     const { error } = await supabase.from('ai_agents').insert({ creator_uid: user.uid, creator_username: user.username, name: form.name, description: form.description, system_prompt: form.system_prompt, price_per_msg: Number(form.price) });
     setBusy(false); if (error) return alert(error.message);
-    setBal(b => Number((b + 0.25).toFixed(2)));
-    setTxs(p => [{ t: `Earned: ${form.name} Creator Reward`, a: '+0.25 Pi', c: '#4ade80' }, ...p]);
-    alert('Agent published! +0.25 Pi reward added.'); setForm({ name: '', description: '', system_prompt: '', price: 0.50 }); setTab('market'); getBots();
+    alert('Agent published! You will earn Pi whenever Pioneers chat with your bot.'); setForm({ name: '', description: '', system_prompt: '', price: 0.50 }); setTab('market'); getBots();
   };
+
 
   const withdraw = () => {
     if (!user) return alert('Please sign in with Pi first!');
