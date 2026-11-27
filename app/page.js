@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 
 const BOTS = [
-  { id: '1', creator_uid: 'guide', creator_username: 'PiPulseOfficial', name: '🧭 AI Concierge: Find Your Best Bot!', description: 'Do not get lost in 1,000+ bots! Tell me your goal, and I will match you with the exact expert bot.', system_prompt: 'You are the PiPulse AI Concierge. Recommend the best bot category and prompt for the user goal.', price_per_msg: 0.22 }
+  { id: '1', creator_uid: 'guide', creator_username: 'PiPulseOfficial', name: '🧭 AI Concierge: Find Your Best Bot!', description: 'Not sure which agent to pick? Tell me your goal, and I will match you with the exact expert and prompt.', system_prompt: 'You are the PiPulse AI Concierge. Recommend the best bot category and prompt for the user goal.', price_per_msg: 0.22 }
 ];
 const LANGS = [['🇬🇧 EN','English'],['🇹🇷 TR','Turkish'],['🇨🇳 ZH','Chinese'],['🇪🇸 ES','Spanish'],['🇮🇳 HI','Hindi'],['🇻🇳 VI','Vietnamese'],['🇰🇷 KO','Korean'],['🇸🇦 AR','Arabic'],['🇮🇩 ID','Indonesian'],['🇷🇺 RU','Russian']];
 const CATS = [['All', ''], ['Pi & Web3', 'pi web3 blockchain defi nft contract'], ['Software & AI', 'code sql python react ai data app cloud'], ['Business & Finance', 'finance sales trade lawyer pitch startup tax'], ['Marketing & SEO', 'seo viral content copywriter social ads brand'], ['Life & Education', 'nutrition fitness travel language tutor chef coach']];
@@ -65,7 +65,7 @@ export default function Home() {
     } catch (e) {} setTrIdx(null);
   };
 
-    const create = async (e) => {
+  const create = async (e) => {
     e.preventDefault(); if (!user) return alert('Please sign in with Pi first!');
     const myCount = agents.filter(a => a.creator_uid === user.uid).length;
     if (myCount >= 3) return alert('Limit reached: You can create up to 3 AI agents per account.');
@@ -74,7 +74,6 @@ export default function Home() {
     setBusy(false); if (error) return alert(error.message);
     alert('Agent published! You will earn Pi whenever Pioneers chat with your bot.'); setForm({ name: '', description: '', system_prompt: '', price: 0.50 }); setTab('market'); getBots();
   };
-
 
   const withdraw = () => {
     if (!user) return alert('Please sign in with Pi first!');
@@ -85,16 +84,14 @@ export default function Home() {
 
   const delBot = async (e, id) => { e.stopPropagation(); if (confirm('Delete this agent?')) { await supabase.from('ai_agents').delete().eq('id', id); getBots(); } };
   const refUrl = 'https://pipulseai' + '.vercel.app/?ref=' + (user?.username || 'Pioneer');
-    const sorted = [...agents].sort((a, b) => (a.creator_uid === 'guide' ? -1 : b.creator_uid === 'guide' ? 1 : a.creator_uid === 'featured' ? -1 : b.creator_uid === 'featured' ? 1 : 0));2
-    const filtered = sorted.filter(b => {
+  const sorted = [...agents].sort((a, b) => (a.creator_uid === 'guide' ? -1 : b.creator_uid === 'guide' ? 1 : a.creator_uid === 'featured' ? -1 : b.creator_uid === 'featured' ? 1 : 0));
+  const filtered = sorted.filter(b => {
     if (cat && b.creator_uid === 'guide') return false;
-    const text = (b.name + ' ' + b.description).toLowerCase();
-    return (!search || text.includes(search.toLowerCase())) && (!cat || cat.split(' ').some(k => text.includes(k)));});
     const text = (b.name + ' ' + b.description).toLowerCase();
     return (!search || text.includes(search.toLowerCase())) && (!cat || cat.split(' ').some(k => text.includes(k)));
   });
   const visibleBots = (search || cat) ? filtered.slice(0, 60) : filtered.slice(0, 30);
-  return (
+    return (
     <div style={{ maxWidth: 500, margin: '0 auto', padding: 14 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #333', paddingBottom: 10 }}>
         <b onClick={() => { setBot(null); setTab('market'); }} style={{ color: '#f5b041', fontSize: 18 }}>⚡ PiPulse AI</b>
@@ -126,10 +123,10 @@ export default function Home() {
           <input placeholder="Short Description" value={form.description} onChange={e => setForm({...form, description: e.target.value})} required style={{ padding: 11, borderRadius: 8 }} />
           <textarea rows={3} placeholder="System Prompt (Instructions)" value={form.system_prompt} onChange={e => setForm({...form, system_prompt: e.target.value})} required style={{ padding: 11, borderRadius: 8 }} />
           <input type="number" step="0.01" min="0.01" value={form.price} onChange={e => setForm({...form, price: e.target.value})} required style={{ padding: 11, borderRadius: 8 }} />
-          <button type="submit" disabled={busy} style={{ background: '#f5b041', padding: 13, borderRadius: 8, fontWeight: 'bold', border: 'none' }}>{busy ? 'Publishing...' : 'Publish Agent (+0.25 Pi Reward)'}</button>
+          <button type="submit" disabled={busy} style={{ background: '#f5b041', padding: 13, borderRadius: 8, fontWeight: 'bold', border: 'none' }}>{busy ? 'Publishing...' : 'Publish Agent'}</button>
         </form>
       )}
-        {tab === 'market' && !bot && (
+      {tab === 'market' && !bot && (
         <div>
           <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Search 1,000+ expert AI agents..." style={{ flex: 1, padding: '10px 12px', borderRadius: 10, background: '#1a142e', color: '#fff', border: '1px solid #4a3578', fontSize: 13 }} />
@@ -188,5 +185,4 @@ export default function Home() {
       )}
     </div>
   );
-        }
-                                          
+                                                                    }
