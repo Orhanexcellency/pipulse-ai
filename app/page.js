@@ -33,6 +33,15 @@ export default function Home() {
     else { setBal(curBal); setTxs(parsedTxs); }
   };
 
+  const requireAuth = (nextTab) => {
+    if (!user) {
+      if (confirm('Please sign in with Pi Wallet first to access this feature. Sign in now?')) login();
+      return;
+    }
+    setBot(null);
+    setTab(nextTab);
+  };
+
   useEffect(() => {
     if (!user) return;
     localStorage.setItem('pp_bal_' + user.uid, String(Math.max(0, bal)));
@@ -44,7 +53,7 @@ export default function Home() {
   const send = async (preset) => {
     const q = (typeof preset === 'string' ? preset : txt).trim();
     if (!q || !bot) return;
-    if (!user) return alert('Please sign in with Pi first!');
+    if (!user) { if (confirm('Please sign in with Pi Wallet first. Sign in now?')) login(); return; }
     const p = Number(bot.price_per_msg);
     let activeBal = bal;
     if (activeBal < p) { activeBal = Number((activeBal + 1.00).toFixed(2)); setTxs(prev => [{ t: 'Auto Testnet Credit Top-Up', a: '+1.00 Pi', c: '#4ade80' }, ...prev]); }
@@ -62,7 +71,8 @@ export default function Home() {
   };
 
   const makeTrade = async (e) => {
-    e.preventDefault(); if (!user) return alert('Please sign in with Pi first!');
+    e.preventDefault();
+    if (!user) { if (confirm('Please sign in with Pi Wallet first. Sign in now?')) login(); return; }
     setBusy(true); setContract('');
     const buyer = trade.role === 'Buying' ? `@${user.username}` : trade.partner;
     const seller = trade.role === 'Selling' ? `@${user.username}` : trade.partner;
@@ -90,7 +100,8 @@ export default function Home() {
   };
 
   const create = async (e) => {
-    e.preventDefault(); if (!user) return alert('Please sign in with Pi first!');
+    e.preventDefault();
+    if (!user) { if (confirm('Please sign in with Pi Wallet first. Sign in now?')) login(); return; }
     if (agents.filter(a => a.creator_uid === user.uid).length >= 3) return alert('Limit reached: Max 3 AI agents per KYC account.');
     setBusy(true);
     const { error } = await supabase.from('ai_agents').insert({ creator_uid: user.uid, creator_username: user.username, name: form.name, description: form.description, system_prompt: form.system_prompt, price_per_msg: Number(form.price) });
@@ -99,7 +110,7 @@ export default function Home() {
   };
 
   const withdraw = () => {
-    if (!user) return alert('Please sign in with Pi first!');
+    if (!user) return;
     if (bal <= 0) return alert('No available balance to withdraw.');
     alert(`${bal} Pi transferred to @${user.username} Pi Wallet!`);
     setTxs(p => [{ t: 'Withdrawn to Pi Wallet', a: `-${bal} Pi`, c: '#f5b041' }, ...p]); setBal(0);
@@ -123,8 +134,8 @@ export default function Home() {
       <div style={{ display: 'flex', gap: 5, margin: '12px 0' }}>
         <button onClick={() => { setBot(null); setTab('market'); }} style={{ flex: 1, padding: 8, background: tab === 'market' ? '#4a3578' : '#1e1633', color: '#fff', border: 'none', borderRadius: 8, fontSize: 11 }}>🤖 Market ({agents.length})</button>
         <button onClick={() => { setBot(null); setTab('trade'); }} style={{ flex: 1, padding: 8, background: tab === 'trade' ? '#0f766e' : '#1e1633', color: '#5eead4', border: 'none', borderRadius: 8, fontSize: 11, fontWeight: 'bold' }}>🤝 Pi Trade</button>
-        <button onClick={() => { setBot(null); setTab('create'); }} style={{ flex: 1, padding: 8, background: tab === 'create' ? '#7d3c98' : '#1e1633', color: '#fff', border: 'none', borderRadius: 8, fontSize: 11 }}>+ Bot</button>
-        <button onClick={() => { if (!user) return alert('Please sign in with Pi first!'); setBot(null); setTab('wallet'); }} style={{ flex: 1, padding: 8, background: tab === 'wallet' ? '#1e4620' : '#1e1633', color: '#4ade80', border: 'none', borderRadius: 8, fontSize: 11 }}>{user ? `💰 ${bal} Pi` : '💰 Wallet'}</button>
+        <button onClick={() => requireAuth('create')} style={{ flex: 1, padding: 8, background: tab === 'create' ? '#7d3c98' : '#1e1633', color: user ? '#fff' : '#888', border: 'none', borderRadius: 8, fontSize: 11 }}>{user ? '+ Bot' : '🔒 + Bot'}</button>
+        <button onClick={() => requireAuth('wallet')} style={{ flex: 1, padding: 8, background: tab === 'wallet' ? '#1e4620' : '#1e1633', color: user ? '#4ade80' : '#888', border: 'none', borderRadius: 8, fontSize: 11 }}>{user ? `💰 ${bal} Pi` : '🔒 Wallet'}</button>
       </div>
       {tab === 'trade' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -188,7 +199,7 @@ export default function Home() {
           {txs.map((x, i) => <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid #2a214a', fontSize: 13 }}><span>{x.t}</span><b style={{ color: x.c }}>{x.a}</b></div>)}
         </div>
       )}
-                {tab === 'create' && (
+                    {tab === 'create' && user && (
         <form onSubmit={create} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ background: '#134e4a', color: '#5eead4', padding: 8, borderRadius: 8, fontSize: 12 }}>🛡️ Publishing with Pi KYC Identity Protection (Max 3 bots/user)</div>
           <input placeholder="Agent Name" value={form.name} onChange={e => setForm({...form, name: e.target.value})} required style={{ padding: 11, borderRadius: 8 }} />
@@ -209,6 +220,8 @@ export default function Home() {
           </div>
           {visibleBots.map((b, idx) => {
             const isG = b.creator_uid === 'guide';
+            const rating = `4.${9 - (idx % 2)}`;
+            const chats = 120 + (idx * 17) % 340;
             return (
               <div key={b.id} onClick={() => { setBot(b); setMsgs([]); }} style={{ background: isG ? 'linear-gradient(135deg, #134e4a, #1e1b4b)' : '#1a142e', padding: 14, borderRadius: 12, marginBottom: 10, border: isG ? '2px solid #2dd4bf' : '1px solid #4a3578' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
@@ -220,7 +233,10 @@ export default function Home() {
                   </div>
                 </div>
                 <p style={{ fontSize: 13, margin: '6px 0', color: isG ? '#e2e8f0' : '#ddd' }}>{b.description}</p>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: isG ? '#5eead4' : '#999' }}><span>🛡️ @{b.creator_username} • KYC</span><span>⭐ 4.{9 - (idx % 2)} ({120 + (idx * 17) % 340} chats)</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: isG ? '#5eead4' : '#999', whiteSpace: 'nowrap' }}>
+                  <span>{`🛡️ @${b.creator_username} • KYC`}</span>
+                  <span>{`⭐ ${rating} (${chats} chats)`}</span>
+                </div>
               </div>
             );
           })}
@@ -244,7 +260,7 @@ export default function Home() {
                 <div style={{ background: m.r === 'u' ? '#5b2c6f' : '#261e45', padding: '8px 12px', borderRadius: 10, display: 'inline-block', fontSize: 14, whiteSpace: 'pre-wrap' }}>{m.t}{m.tr && <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid #4a3578', color: '#a5f3fc', fontSize: 13 }}>{m.tr}</div>}</div>
                 {m.r === 'a' && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 6 }}>
-                    <button type="button" onClick={() => { navigator.clipboard?.writeText(m.tr || m.t.replace(/^\[x402.*?\]\s*/, '')); alert('Response copied!'); }} style={{ background: '#0d9488', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 8px', fontSize: 11, fontWeight: 'bold' }}>📋 Copy</button>
+                    <button type="button" onClick={() => { navigator.clipboard?.writeText(m.tr || m.t.replace(/^\[.*?Paid.*?\]\s*/, '')); alert('Response copied!'); }} style={{ background: '#0d9488', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 8px', fontSize: 11, fontWeight: 'bold' }}>📋 Copy</button>
                     {LANGS.map(([l, c]) => <button type="button" key={c} onClick={() => trMsg(i, m.t, c)} disabled={trIdx === i} style={{ background: '#1e1633', color: '#f5b041', border: '1px solid #4a3578', borderRadius: 6, padding: '4px 8px', fontSize: 11 }}>{l}</button>)}
                   </div>
                 )}
@@ -257,5 +273,5 @@ export default function Home() {
       )}
     </div>
   );
-                  }
-                  
+            }
+                      
