@@ -6,14 +6,27 @@ const BOTS = [
   { id: '1', creator_uid: 'guide', creator_username: 'PiPulseOfficial', name: '🧭 AI Concierge: Find Your Best Bot!', description: 'Not sure which agent to pick? Tell me your goal, and I will match you with the exact expert and prompt.', system_prompt: 'You are the PiPulse AI Concierge. Recommend the best bot category and prompt for the user goal.', price_per_msg: 0.22 }
 ];
 const LANGS = [['🇬🇧 EN','English'],['🇹🇷 TR','Turkish'],['🇨🇳 ZH','Chinese'],['🇪🇸 ES','Spanish'],['🇮🇳 HI','Hindi'],['🇻🇳 VI','Vietnamese'],['🇰🇷 KO','Korean'],['🇸🇦 AR','Arabic'],['🇮🇩 ID','Indonesian'],['🇷🇺 RU','Russian']];
-const CATS = [['All', ''], ['Pi & Web3', 'pi web3 blockchain defi nft contract'], ['Software & AI', 'code sql python react ai data app cloud'], ['Business & Finance', 'finance sales trade lawyer pitch startup tax'], ['Marketing & SEO', 'seo viral content copywriter social ads brand'], ['Life & Education', 'nutrition fitness travel language tutor chef coach']];
+const CATS = [
+  ['All', null],
+  ['Pi & Web3', /\b(pi|web3|blockchain|defi|nft|solidity|tokenomics|crypto|smart contract|escrow)\b/i],
+  ['Software & AI', /\b(code|sql|python|react|next\.js|software|developer|bug|cloud|devops|app|aso|database|supabase|prompt|automation)\b/i],
+  ['Business & Finance', /\b(finance|sales|trade|lawyer|pitch|startup|vc|tax|budget|real estate|b2b|contract|supply chain|customs)\b/i],
+  ['Marketing & SEO', /\b(seo|viral|content|copywriter|social|ads|brand|shorts|reels|tiktok|instagram|linkedin|newsletter)\b/i],
+  ['Life & Education', /\b(nutrition|fitness|travel|language|tutor|chef|coach|sleep|yoga|running|parenting|pet|ielts|math)\b/i]
+];
+
+const hashNum = (s) => {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 997;
+  return h;
+};
 
 export default function Home() {
   const [user, setUser] = useState(null), [agents, setAgents] = useState(BOTS), [bot, setBot] = useState(null);
-  const [msgs, setMsgs] = useState([]), [txt, setTxt] = useState(''), [search, setSearch] = useState(''), [cat, setCat] = useState('');
+  const [msgs, setMsgs] = useState([]), [txt, setTxt] = useState(''), [search, setSearch] = useState(''), [catIdx, setCatIdx] = useState(0);
   const [busy, setBusy] = useState(false), [trIdx, setTrIdx] = useState(null), [tab, setTab] = useState('market'), [bal, setBal] = useState(1.00);
   const [txs, setTxs] = useState([{ t: 'PioneerPro Welcome Balance', a: '+1.00 Pi', c: '#4ade80' }]);
-  const [form, setForm] = useState({ name: '', description: '', system_prompt: '', price: 0.50 });
+  const [form, setForm] = useState({ name: '', category: 'Pi & Web3', description: '', system_prompt: '', price: '0.50' });
   const [trade, setTrade] = useState({ role: 'Buying', partner: '', item: '', amount: '' }), [contract, setContract] = useState('');
   const [recentTrades, setRecentTrades] = useState([
     { pair: '@Web3Dev ↔ @DesignPi', item: 'Mobile App UI Kit', amt: '25 Pi', status: 'Sealed' },
@@ -25,7 +38,7 @@ export default function Home() {
   const login = () => {
     const u = { uid: 'pioneer-pro-user', username: 'PioneerPro', kyc: true };
     setUser(u);
-    const sBal = localStorage.getItem('pp_bal_' + u.uid), sTxs = localStorage.getItem('pp_txs_' + u.uid);
+    const sBal = localStorage.getItem('pp_v2_bal_' + u.uid), sTxs = localStorage.getItem('pp_v2_txs_' + u.uid);
     let parsedTxs = [{ t: 'PioneerPro Welcome Balance', a: '+1.00 Pi', c: '#4ade80' }];
     if (sTxs) try { parsedTxs = JSON.parse(sTxs); } catch (e) {}
     const curBal = sBal !== null ? Number(sBal) : 1.00;
@@ -44,8 +57,8 @@ export default function Home() {
 
   useEffect(() => {
     if (!user) return;
-    localStorage.setItem('pp_bal_' + user.uid, String(Math.max(0, bal)));
-    localStorage.setItem('pp_txs_' + user.uid, JSON.stringify(txs));
+    localStorage.setItem('pp_v2_bal_' + user.uid, String(Math.max(0, bal)));
+    localStorage.setItem('pp_v2_txs_' + user.uid, JSON.stringify(txs));
   }, [bal, txs, user]);
 
   const getBots = async () => { const { data } = await supabase.from('ai_agents').select('*').limit(1000); if (data?.length) setAgents(data); };
@@ -64,8 +77,8 @@ export default function Home() {
       const res = await fetch('/api/payments/approve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: q, systemPrompt: hist ? `${bot.system_prompt}\n\nHistory:\n${hist}` : bot.system_prompt }) });
       const data = await res.json();
       setBal(Math.max(0, Number((activeBal - p).toFixed(2))));
-      setTxs(prev => [{ t: `Spent: ${bot.name}`, a: `-${p} Pi`, c: '#f87171' }, ...prev]);
-      setMsgs(prev => [...prev, { r: 'u', t: q }, { r: 'a', t: `[Pi SDK Paid: ${p} Pi] ` + (data.reply || 'Response ready.') }]);
+      setTxs(prev => [{ t: `Spent: ${bot.name}`, a: `-${p.toFixed(2)} Pi`, c: '#f87171' }, ...prev]);
+      setMsgs(prev => [...prev, { r: 'u', t: q }, { r: 'a', t: `[Pi SDK Paid: ${p.toFixed(2)} Pi] ` + (data.reply || 'Response ready.') }]);
     } catch (e) { setMsgs(prev => [...prev, { r: 'u', t: q }, { r: 'a', t: '⚠️ Error: ' + e.message }]); }
     setBusy(false);
   };
@@ -103,28 +116,30 @@ export default function Home() {
     e.preventDefault();
     if (!user) { if (confirm('Please sign in with Pi Wallet first. Sign in now?')) login(); return; }
     if (agents.filter(a => a.creator_uid === user.uid).length >= 3) return alert('Limit reached: Max 3 AI agents per KYC account.');
+    const numPrice = Math.max(0.01, Number(String(form.price).replace(',', '.')) || 0.50);
     setBusy(true);
-    const { error } = await supabase.from('ai_agents').insert({ creator_uid: user.uid, creator_username: user.username, name: form.name, description: form.description, system_prompt: form.system_prompt, price_per_msg: Number(form.price) });
+    const { error } = await supabase.from('ai_agents').insert({ creator_uid: user.uid, creator_username: user.username, name: form.name, description: `[${form.category}] ${form.description}`, system_prompt: form.system_prompt, price_per_msg: numPrice });
     setBusy(false); if (error) return alert(error.message);
-    alert('KYC-Verified Agent published!'); setForm({ name: '', description: '', system_prompt: '', price: 0.50 }); setTab('market'); getBots();
+    alert('KYC-Verified Agent published!'); setForm({ name: '', category: 'Pi & Web3', description: '', system_prompt: '', price: '0.50' }); setTab('market'); getBots();
   };
 
   const withdraw = () => {
     if (!user) return;
     if (bal <= 0) return alert('No available balance to withdraw.');
-    alert(`${bal} Pi transferred to @${user.username} Pi Wallet!`);
-    setTxs(p => [{ t: 'Withdrawn to Pi Wallet', a: `-${bal} Pi`, c: '#f5b041' }, ...p]); setBal(0);
+    alert(`${bal.toFixed(2)} Pi transferred to @${user.username} Pi Wallet!`);
+    setTxs(p => [{ t: 'Withdrawn to Pi Wallet', a: `-${bal.toFixed(2)} Pi`, c: '#f5b041' }, ...p]); setBal(0);
   };
 
   const delBot = async (e, id) => { e.stopPropagation(); if (confirm('Delete this agent?')) { await supabase.from('ai_agents').delete().eq('id', id); getBots(); } };
   const refUrl = 'https://pipulseai' + '.vercel.app/?ref=' + (user?.username || 'Pioneer');
+  const activeRegex = CATS[catIdx][1];
   const sorted = [...agents].sort((a, b) => (a.creator_uid === 'guide' ? -1 : b.creator_uid === 'guide' ? 1 : a.creator_uid === 'featured' ? -1 : b.creator_uid === 'featured' ? 1 : 0));
   const filtered = sorted.filter(b => {
-    if (cat && b.creator_uid === 'guide') return false;
-    const text = (b.name + ' ' + b.description).toLowerCase();
-    return (!search || text.includes(search.toLowerCase())) && (!cat || cat.split(' ').some(k => text.includes(k)));
+    if (activeRegex && b.creator_uid === 'guide') return false;
+    const text = b.name + ' ' + b.description;
+    return (!search || text.toLowerCase().includes(search.toLowerCase())) && (!activeRegex || activeRegex.test(text));
   });
-  const visibleBots = (search || cat) ? filtered.slice(0, 60) : filtered.slice(0, 30);
+  const visibleBots = (search || activeRegex) ? filtered.slice(0, 60) : filtered.slice(0, 30);
     return (
     <div style={{ maxWidth: 500, margin: '0 auto', padding: 14 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #333', paddingBottom: 10 }}>
@@ -135,7 +150,7 @@ export default function Home() {
         <button onClick={() => { setBot(null); setTab('market'); }} style={{ flex: 1, padding: 8, background: tab === 'market' ? '#4a3578' : '#1e1633', color: '#fff', border: 'none', borderRadius: 8, fontSize: 11 }}>🤖 Market ({agents.length})</button>
         <button onClick={() => { setBot(null); setTab('trade'); }} style={{ flex: 1, padding: 8, background: tab === 'trade' ? '#0f766e' : '#1e1633', color: '#5eead4', border: 'none', borderRadius: 8, fontSize: 11, fontWeight: 'bold' }}>🤝 Pi Trade</button>
         <button onClick={() => requireAuth('create')} style={{ flex: 1, padding: 8, background: tab === 'create' ? '#7d3c98' : '#1e1633', color: user ? '#fff' : '#888', border: 'none', borderRadius: 8, fontSize: 11 }}>{user ? '+ Bot' : '🔒 + Bot'}</button>
-        <button onClick={() => requireAuth('wallet')} style={{ flex: 1, padding: 8, background: tab === 'wallet' ? '#1e4620' : '#1e1633', color: user ? '#4ade80' : '#888', border: 'none', borderRadius: 8, fontSize: 11 }}>{user ? `💰 ${bal} Pi` : '🔒 Wallet'}</button>
+        <button onClick={() => requireAuth('wallet')} style={{ flex: 1, padding: 8, background: tab === 'wallet' ? '#1e4620' : '#1e1633', color: user ? '#4ade80' : '#888', border: 'none', borderRadius: 8, fontSize: 11 }}>{user ? `💰 ${bal.toFixed(2)} Pi` : '🔒 Wallet'}</button>
       </div>
       {tab === 'trade' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -152,7 +167,7 @@ export default function Home() {
               <input placeholder={trade.role === 'Buying' ? 'Seller Username (e.g. @SellerPi)' : 'Buyer Username (e.g. @BuyerPi)'} value={trade.partner} onChange={e => setTrade({...trade, partner: e.target.value})} required style={{ padding: 10, borderRadius: 8 }} />
               <input placeholder="Goods or Service Description" value={trade.item} onChange={e => setTrade({...trade, item: e.target.value})} required style={{ padding: 10, borderRadius: 8 }} />
               <label style={{ fontSize: 11, color: '#5eead4', marginTop: 2 }}>Agreed Price (in Pi):</label>
-              <input type="number" step="0.1" min="0.1" placeholder="Amount in Pi (e.g., 10 Pi)" value={trade.amount} onChange={e => setTrade({...trade, amount: e.target.value})} required style={{ padding: 10, borderRadius: 8 }} />
+              <input type="text" inputMode="decimal" placeholder="Amount in Pi (e.g., 10 Pi)" value={trade.amount} onChange={e => setTrade({...trade, amount: e.target.value})} required style={{ padding: 10, borderRadius: 8 }} />
               <button type="submit" disabled={busy} style={{ background: '#2dd4bf', color: '#000', padding: 11, borderRadius: 8, fontWeight: 'bold', border: 'none', marginTop: 4 }}>{busy ? 'Drafting Smart Contract...' : 'Generate KYC Pi Trade Agreement'}</button>
             </form>
             {contract && (
@@ -187,7 +202,7 @@ export default function Home() {
       {tab === 'wallet' && user && (
         <div style={{ background: '#1a142e', padding: 14, borderRadius: 12, border: '1px solid #4a3578' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#0f0c29', padding: 12, borderRadius: 10, marginBottom: 12 }}>
-            <div><small style={{ color: '#999' }}>Available Balance</small><div style={{ fontSize: 20, fontWeight: 'bold', color: '#4ade80' }}>{bal} Pi</div></div>
+            <div><small style={{ color: '#999' }}>Available Balance</small><div style={{ fontSize: 20, fontWeight: 'bold', color: '#4ade80' }}>{bal.toFixed(2)} Pi</div></div>
             <button onClick={withdraw} style={{ background: '#4ade80', color: '#000', padding: '9px 14px', borderRadius: 8, border: 'none', fontWeight: 'bold', fontSize: 12 }}>Withdraw Pi</button>
           </div>
           <b style={{ color: '#f5b041', fontSize: 13 }}>🎁 Referral Link (10% Pi Commission)</b>
@@ -199,13 +214,17 @@ export default function Home() {
           {txs.map((x, i) => <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid #2a214a', fontSize: 13 }}><span>{x.t}</span><b style={{ color: x.c }}>{x.a}</b></div>)}
         </div>
       )}
-                    {tab === 'create' && user && (
+        {tab === 'create' && user && (
         <form onSubmit={create} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ background: '#134e4a', color: '#5eead4', padding: 8, borderRadius: 8, fontSize: 12 }}>🛡️ Publishing with Pi KYC Identity Protection (Max 3 bots/user)</div>
           <input placeholder="Agent Name" value={form.name} onChange={e => setForm({...form, name: e.target.value})} required style={{ padding: 11, borderRadius: 8 }} />
+          <select value={form.category} onChange={e => setForm({...form, category: e.target.value})} style={{ padding: 11, borderRadius: 8, background: '#fff', color: '#000' }}>
+            {CATS.slice(1).map(([lbl]) => <option key={lbl} value={lbl}>Category: {lbl}</option>)}
+          </select>
           <input placeholder="Short Description" value={form.description} onChange={e => setForm({...form, description: e.target.value})} required style={{ padding: 11, borderRadius: 8 }} />
           <textarea rows={3} placeholder="System Prompt (Instructions)" value={form.system_prompt} onChange={e => setForm({...form, system_prompt: e.target.value})} required style={{ padding: 11, borderRadius: 8 }} />
-          <input type="number" step="0.01" min="0.01" value={form.price} onChange={e => setForm({...form, price: e.target.value})} required style={{ padding: 11, borderRadius: 8 }} />
+          <label style={{ fontSize: 11, color: '#f5b041' }}>Price per Message (in Pi):</label>
+          <input type="text" inputMode="decimal" placeholder="0.50" value={form.price} onChange={e => setForm({...form, price: e.target.value})} required style={{ padding: 11, borderRadius: 8 }} />
           <button type="submit" disabled={busy} style={{ background: '#f5b041', padding: 13, borderRadius: 8, fontWeight: 'bold', border: 'none' }}>{busy ? 'Publishing...' : 'Publish KYC-Verified Agent'}</button>
         </form>
       )}
@@ -216,19 +235,20 @@ export default function Home() {
             {search && <button onClick={() => setSearch('')} style={{ background: '#4a3578', color: '#fff', border: 'none', borderRadius: 10, padding: '0 12px', fontWeight: 'bold' }}>✕</button>}
           </div>
           <div style={{ display: 'flex', gap: 5, overflowX: 'auto', paddingBottom: 8, marginBottom: 6 }}>
-            {CATS.map(([lbl, keys]) => <button key={lbl} onClick={() => setCat(keys)} style={{ whiteSpace: 'nowrap', padding: '5px 10px', borderRadius: 14, border: '1px solid #4a3578', background: cat === keys ? '#f5b041' : '#1a142e', color: cat === keys ? '#000' : '#ddd', fontSize: 11, fontWeight: 'bold' }}>{lbl}</button>)}
+            {CATS.map(([lbl], i) => <button key={lbl} onClick={() => setCatIdx(i)} style={{ whiteSpace: 'nowrap', padding: '5px 10px', borderRadius: 14, border: '1px solid #4a3578', background: catIdx === i ? '#f5b041' : '#1a142e', color: catIdx === i ? '#000' : '#ddd', fontSize: 11, fontWeight: 'bold' }}>{lbl}</button>)}
           </div>
-          {visibleBots.map((b, idx) => {
+          {visibleBots.map((b) => {
             const isG = b.creator_uid === 'guide';
-            const rating = `4.${9 - (idx % 2)}`;
-            const chats = 120 + (idx * 17) % 340;
+            const h = hashNum(b.name + String(b.id));
+            const rating = (4.7 + (h % 3) * 0.1).toFixed(1);
+            const chats = 64 + (h % 380);
             return (
               <div key={b.id} onClick={() => { setBot(b); setMsgs([]); }} style={{ background: isG ? 'linear-gradient(135deg, #134e4a, #1e1b4b)' : '#1a142e', padding: 14, borderRadius: 12, marginBottom: 10, border: isG ? '2px solid #2dd4bf' : '1px solid #4a3578' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
                   <b style={{ color: isG ? '#5eead4' : '#f5b041', fontSize: 14 }}>{b.name}</b>
                   <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
                     {isG && <span style={{ background: '#0d9488', color: '#fff', padding: '2px 7px', borderRadius: 6, fontSize: 10, fontWeight: 'bold' }}>📌 GUIDE</span>}
-                    <span style={{ background: '#2e1a47', padding: '2px 8px', borderRadius: 8, fontSize: 12 }}>{b.price_per_msg} Pi</span>
+                    <span style={{ background: '#2e1a47', padding: '2px 8px', borderRadius: 8, fontSize: 12 }}>{Number(b.price_per_msg).toFixed(2)} Pi</span>
                     {user && b.creator_uid === user.uid && <button onClick={e => delBot(e, b.id)} style={{ background: '#7f1d1d', color: '#fca5a5', border: 'none', padding: '2px 8px', borderRadius: 6, fontSize: 11 }}>Del</button>}
                   </div>
                 </div>
@@ -240,7 +260,7 @@ export default function Home() {
               </div>
             );
           })}
-          {!search && !cat && filtered.length > 30 && <p style={{ textAlign: 'center', color: '#888', fontSize: 12 }}>Showing top 30 agents. Search or pick a category to explore all <b>{agents.length}</b> agents.</p>}
+          {!search && catIdx === 0 && filtered.length > 30 && <p style={{ textAlign: 'center', color: '#888', fontSize: 12 }}>Showing top 30 agents. Search or pick a category to explore all <b>{agents.length}</b> agents.</p>}
         </div>
       )}
       {bot && (
@@ -273,5 +293,5 @@ export default function Home() {
       )}
     </div>
   );
-            }
-                      
+        }
+          
