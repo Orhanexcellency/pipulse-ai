@@ -89,8 +89,7 @@ export default function Home() {
     const filtered = sorted.filter(b => {
     if (cat && b.creator_uid === 'guide') return false;
     const text = (b.name + ' ' + b.description).toLowerCase();
-    return (!search || text.includes(search.toLowerCase())) && (!cat || cat.split(' ').some(k => text.includes(k)));
-  });
+    return (!search || text.includes(search.toLowerCase())) && (!cat || cat.split(' ').some(k => text.includes(k)));});
     const text = (b.name + ' ' + b.description).toLowerCase();
     return (!search || text.includes(search.toLowerCase())) && (!cat || cat.split(' ').some(k => text.includes(k)));
   });
