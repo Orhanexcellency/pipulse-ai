@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 
 const BOTS = [
-  { id: '1', creator_uid: 'guide', creator_username: 'PiPulseOfficial', name: '🧭 AI Rehber: Sana En Uygun Botu Bul!', description: 'Kalabalikta kaybolma! Ne yapmak istedigini yaz, sana pazardaki en dogru uzman botu bulayim.', system_prompt: 'You are the PiPulse AI Concierge. Recommend the best bot category and prompt for the user goal.', price_per_msg: 0.22 }
+  { id: '1', creator_uid: 'guide', creator_username: 'PiPulseOfficial', name: '🧭 AI Rehber: Sana En Uygun Botu Bul!', description: 'Kalabalikta kaybolma! Ne yapmak istedigini yaz, sana en dogru uzman botu bulayim.', system_prompt: 'You are the PiPulse AI Concierge. Recommend the best bot category and prompt for the user goal.', price_per_msg: 0.22 }
 ];
 const LANGS = [['🇹🇷 TR','Turkish'],['🇬🇧 EN','English'],['🇨🇳 ZH','Chinese'],['🇪🇸 ES','Spanish'],['🇮🇳 HI','Hindi'],['🇻🇳 VI','Vietnamese'],['🇰🇷 KO','Korean'],['🇸🇦 AR','Arabic'],['🇮🇩 ID','Indonesian'],['🇷🇺 RU','Russian']];
 const CATS = [['Tumu', ''], ['Pi & Web3', 'pi web3 blockchain defi nft contract'], ['Yazilim & AI', 'code sql python react ai data app cloud'], ['Is & Finans', 'finance sales trade lawyer pitch startup tax'], ['Pazarlama & SEO', 'seo viral content copywriter social ads brand'], ['Yasam & Egitim', 'nutrition fitness travel language tutor chef coach']];
@@ -64,7 +64,8 @@ export default function Home() {
       setMsgs(p => p.map((m, i) => i === idx ? { ...m, tr: `[🌐 ${lang}]: ${data.reply || 'Tekrar deneyin.'}` } : m));
     } catch (e) {} setTrIdx(null);
   };
-    const create = async (e) => {
+
+  const create = async (e) => {
     e.preventDefault(); if (!user) return alert('Once Pi ile Giris yapin!'); setBusy(true);
     const { error } = await supabase.from('ai_agents').insert({ creator_uid: user.uid, creator_username: user.username, name: form.name, description: form.description, system_prompt: form.system_prompt, price_per_msg: Number(form.price) });
     setBusy(false); if (error) return alert(error.message);
@@ -88,8 +89,7 @@ export default function Home() {
     return (!search || text.includes(search.toLowerCase())) && (!cat || cat.split(' ').some(k => text.includes(k)));
   });
   const visibleBots = (search || cat) ? filtered.slice(0, 60) : filtered.slice(0, 30);
-
-  return (
+    return (
     <div style={{ maxWidth: 500, margin: '0 auto', padding: 14 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #333', paddingBottom: 10 }}>
         <b onClick={() => { setBot(null); setTab('market'); }} style={{ color: '#f5b041', fontSize: 18 }}>⚡ PiPulse AI</b>
@@ -115,7 +115,7 @@ export default function Home() {
           {txs.map((x, i) => <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid #2a214a', fontSize: 13 }}><span>{x.t}</span><b style={{ color: x.c }}>{x.a}</b></div>)}
         </div>
       )}
-        {tab === 'create' && (
+      {tab === 'create' && (
         <form onSubmit={create} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <input placeholder="Bot Adi" value={form.name} onChange={e => setForm({...form, name: e.target.value})} required style={{ padding: 11, borderRadius: 8 }} />
           <input placeholder="Aciklama" value={form.description} onChange={e => setForm({...form, description: e.target.value})} required style={{ padding: 11, borderRadius: 8 }} />
@@ -183,5 +183,5 @@ export default function Home() {
       )}
     </div>
   );
-        }
-          w
+                      }
+        
