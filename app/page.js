@@ -14,7 +14,7 @@ export default function Home() {
   const [busy, setBusy] = useState(false), [trIdx, setTrIdx] = useState(null), [tab, setTab] = useState('market'), [bal, setBal] = useState(1.00);
   const [txs, setTxs] = useState([{ t: 'PioneerPro Welcome Balance', a: '+1.00 Pi', c: '#4ade80' }]);
   const [form, setForm] = useState({ name: '', description: '', system_prompt: '', price: 0.50 });
-  const [trade, setTrade] = useState({ partner: '', item: '', amount: '' }), [contract, setContract] = useState('');
+  const [trade, setTrade] = useState({ role: 'Buying', partner: '', item: '', amount: '' }), [contract, setContract] = useState('');
   const [recentTrades, setRecentTrades] = useState([
     { pair: '@Web3Dev ↔ @DesignPi', item: 'Mobile App UI Kit', amt: '25 Pi', status: 'Sealed' },
     { pair: '@LocalCafe ↔ @Pioneer88', item: 'Coffee & Pastry Voucher', amt: '4.5 Pi', status: 'Sealed' }
@@ -56,7 +56,7 @@ export default function Home() {
       const data = await res.json();
       setBal(Math.max(0, Number((activeBal - p).toFixed(2))));
       setTxs(prev => [{ t: `Spent: ${bot.name}`, a: `-${p} Pi`, c: '#f87171' }, ...prev]);
-      setMsgs(prev => [...prev, { r: 'u', t: q }, { r: 'a', t: `[x402 Paid: ${p} Pi] ` + (data.reply || 'Response ready.') }]);
+      setMsgs(prev => [...prev, { r: 'u', t: q }, { r: 'a', t: `[Pi SDK Paid: ${p} Pi] ` + (data.reply || 'Response ready.') }]);
     } catch (e) { setMsgs(prev => [...prev, { r: 'u', t: q }, { r: 'a', t: '⚠️ Error: ' + e.message }]); }
     setBusy(false);
   };
@@ -64,24 +64,26 @@ export default function Home() {
   const makeTrade = async (e) => {
     e.preventDefault(); if (!user) return alert('Please sign in with Pi first!');
     setBusy(true); setContract('');
+    const buyer = trade.role === 'Buying' ? `@${user.username}` : trade.partner;
+    const seller = trade.role === 'Selling' ? `@${user.username}` : trade.partner;
     try {
-      const res = await fetch('/api/payments/approve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: `Party A: @${user.username} (KYC Verified), Party B: ${trade.partner}, Item/Service: ${trade.item}, Agreed Price: ${trade.amount} Pi`, systemPrompt: 'You are the PiPulse P2P Smart Trade & Contract AI. Draft a concise, clear Pi Network peer-to-peer trade agreement with KYC identity status, delivery terms, and mutual confirmation clauses.' }) });
+      const res = await fetch('/api/payments/approve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: `Buyer (Pays Pi): ${buyer}, Seller (Delivers): ${seller}, Item/Service: ${trade.item}, Agreed Price: ${trade.amount} Pi`, systemPrompt: 'You are the PiPulse P2P Smart Trade & Contract AI. Draft a concise, clear Pi Network peer-to-peer trade agreement clearly stating Buyer and Seller obligations, KYC status, delivery terms, and mutual confirmation clauses.' }) });
       const data = await res.json();
       setContract(data.reply || 'Smart trade contract generated.');
-      setRecentTrades(prev => [{ pair: `@${user.username} ↔ ${trade.partner}`, item: trade.item, amt: `${trade.amount} Pi`, status: 'Drafted' }, ...prev.slice(0, 3)]);
+      setRecentTrades(prev => [{ pair: `${buyer} ↔ ${seller}`, item: trade.item, amt: `${trade.amount} Pi`, status: 'Drafted' }, ...prev.slice(0, 3)]);
     } catch (e) { setContract('Error generating contract.'); }
     setBusy(false);
   };
 
   const sealContract = () => {
-    alert(`Contract sealed with x402 Proof! Share it in Pi Chat with ${trade.partner}.`);
+    alert(`Contract sealed with Pi SDK Proof! Copy and share it with ${trade.partner} via Pi Chats.`);
     setRecentTrades(prev => prev.map((r, i) => i === 0 ? { ...r, status: 'Sealed' } : r));
   };
 
   const trMsg = async (idx, raw, lang) => {
     setTrIdx(idx); setMsgs(p => p.map((m, i) => i === idx ? { ...m, tr: `⏳ Translating to ${lang}...` } : m));
     try {
-      const res = await fetch('/api/payments/approve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: raw.replace(/^\[x402.*?\]\s*/, ''), systemPrompt: `Translate into ${lang}. Return ONLY translation.` }) });
+      const res = await fetch('/api/payments/approve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: raw.replace(/^\[.*?Paid.*?\]\s*/, ''), systemPrompt: `Translate into ${lang}. Return ONLY translation.` }) });
       const data = await res.json();
       setMsgs(p => p.map((m, i) => i === idx ? { ...m, tr: `[🌐 ${lang}]: ${data.reply || 'Please try again.'}` } : m));
     } catch (e) {} setTrIdx(null);
@@ -112,7 +114,7 @@ export default function Home() {
     return (!search || text.includes(search.toLowerCase())) && (!cat || cat.split(' ').some(k => text.includes(k)));
   });
   const visibleBots = (search || cat) ? filtered.slice(0, 60) : filtered.slice(0, 30);
-  return (
+    return (
     <div style={{ maxWidth: 500, margin: '0 auto', padding: 14 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #333', paddingBottom: 10 }}>
         <b onClick={() => { setBot(null); setTab('market'); }} style={{ color: '#f5b041', fontSize: 18 }}>⚡ PiPulse AI</b>
@@ -129,8 +131,14 @@ export default function Home() {
           <div style={{ background: '#1a142e', padding: 14, borderRadius: 12, border: '1px solid #2dd4bf' }}>
             <b style={{ color: '#5eead4', fontSize: 14 }}>🤝 Pi P2P Smart Trade & Contract AI</b>
             <p style={{ fontSize: 12, color: '#ccc', margin: '6px 0 12px' }}>Draft a clear, KYC-backed peer-to-peer trade agreement for local goods, services, or freelancing on Pi.</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+              <span style={{ fontSize: 12, color: '#5eead4', fontWeight: 'bold' }}>I am:</span>
+              {['Buying', 'Selling'].map(r => (
+                <button type="button" key={r} onClick={() => setTrade({...trade, role: r})} style={{ flex: 1, padding: '7px', borderRadius: 8, border: '1px solid #2dd4bf', background: trade.role === r ? '#2dd4bf' : '#0f0c29', color: trade.role === r ? '#000' : '#5eead4', fontWeight: 'bold', fontSize: 12 }}>{r === 'Buying' ? '🛒 Buying' : '🏷️ Selling'}</button>
+              ))}
+            </div>
             <form onSubmit={makeTrade} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <input placeholder="Trading Partner Username (e.g. @SellerPi)" value={trade.partner} onChange={e => setTrade({...trade, partner: e.target.value})} required style={{ padding: 10, borderRadius: 8 }} />
+              <input placeholder={trade.role === 'Buying' ? 'Seller Username (e.g. @SellerPi)' : 'Buyer Username (e.g. @BuyerPi)'} value={trade.partner} onChange={e => setTrade({...trade, partner: e.target.value})} required style={{ padding: 10, borderRadius: 8 }} />
               <input placeholder="Goods or Service Description" value={trade.item} onChange={e => setTrade({...trade, item: e.target.value})} required style={{ padding: 10, borderRadius: 8 }} />
               <label style={{ fontSize: 11, color: '#5eead4', marginTop: 2 }}>Agreed Price (in Pi):</label>
               <input type="number" step="0.1" min="0.1" placeholder="Amount in Pi (e.g., 10 Pi)" value={trade.amount} onChange={e => setTrade({...trade, amount: e.target.value})} required style={{ padding: 10, borderRadius: 8 }} />
@@ -140,8 +148,8 @@ export default function Home() {
               <div style={{ marginTop: 12, background: '#0f0c29', padding: 12, borderRadius: 8, border: '1px solid #4a3578' }}>
                 <div style={{ fontSize: 12, whiteSpace: 'pre-wrap', color: '#e2e8f0' }}>{contract}</div>
                 <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
-                  <button onClick={() => { navigator.clipboard?.writeText(contract); alert('Contract copied!'); }} style={{ flex: 1, background: '#f5b041', padding: '8px', borderRadius: 6, border: 'none', fontWeight: 'bold', fontSize: 11 }}>📋 Copy for Pi Chat</button>
-                  <button onClick={sealContract} style={{ flex: 1, background: '#4ade80', color: '#000', padding: '8px', borderRadius: 6, border: 'none', fontWeight: 'bold', fontSize: 11 }}>🛡️ Seal with x402</button>
+                  <button onClick={() => { navigator.clipboard?.writeText(contract); alert('Contract copied for Pi Chats!'); }} style={{ flex: 1, background: '#f5b041', padding: '8px', borderRadius: 6, border: 'none', fontWeight: 'bold', fontSize: 11 }}>📋 Copy for Pi Chats</button>
+                  <button onClick={sealContract} style={{ flex: 1, background: '#4ade80', color: '#000', padding: '8px', borderRadius: 6, border: 'none', fontWeight: 'bold', fontSize: 11 }}>🛡️ Seal with Pi SDK</button>
                 </div>
               </div>
             )}
@@ -149,9 +157,9 @@ export default function Home() {
           <div style={{ background: '#1a142e', padding: 12, borderRadius: 12, border: '1px solid #4a3578' }}>
             <b style={{ color: '#f5b041', fontSize: 12 }}>⚡ How P2P Smart Trade Works</b>
             <div style={{ fontSize: 11, color: '#ccc', marginTop: 6, lineHeight: 1.5 }}>
-              1. Enter KYC-verified Pioneer usernames & agreed Pi amount.<br/>
+              1. Select your role (Buying/Selling) & enter partner username.<br/>
               2. AI drafts clear delivery & dispute-protection terms.<br/>
-              3. Seal with x402 & share directly in Pi Browser Chat.
+              3. Seal with Pi SDK & share via Pi Chats or Link.
             </div>
           </div>
           <div style={{ background: '#1a142e', padding: 12, borderRadius: 12, border: '1px solid #4a3578' }}>
@@ -176,7 +184,7 @@ export default function Home() {
             <input readOnly value={refUrl} style={{ flex: 1, padding: 8, borderRadius: 6, fontSize: 11, background: '#0f0c29', color: '#fff', border: '1px solid #333' }} />
             <button onClick={() => { navigator.clipboard?.writeText(refUrl); alert('Referral link copied!'); }} style={{ background: '#f5b041', padding: '8px 12px', borderRadius: 6, border: 'none', fontWeight: 'bold', fontSize: 12 }}>Copy</button>
           </div>
-          <b style={{ color: '#f5b041', fontSize: 13 }}>📊 x402 Income & Expense Ledger</b>
+          <b style={{ color: '#f5b041', fontSize: 13 }}>📊 Pi SDK Income & Expense Ledger</b>
           {txs.map((x, i) => <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid #2a214a', fontSize: 13 }}><span>{x.t}</span><b style={{ color: x.c }}>{x.a}</b></div>)}
         </div>
       )}
@@ -249,4 +257,5 @@ export default function Home() {
       )}
     </div>
   );
-                                                           }
+                  }
+                  
