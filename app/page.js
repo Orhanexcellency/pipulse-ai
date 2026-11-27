@@ -125,7 +125,7 @@ export default function Home() {
 
   const delBot = async (e, id) => { e.stopPropagation(); if (confirm('Delete this agent?')) { await supabase.from('ai_agents').delete().eq('id', id); getBots(); } };
   const refUrl = 'https://pipulseai' + '.vercel.app/?ref=' + (user?.username || 'Pioneer');
-  const activeRegex = CATS[catIdx];
+  const activeRegex = CATS[catIdx][1];
   const sorted = [...agents].sort((a, b) => (a.creator_uid === 'guide' ? -1 : b.creator_uid === 'guide' ? 1 : a.creator_uid === 'featured' ? -1 : b.creator_uid === 'featured' ? 1 : 0));
   const filtered = sorted.filter(b => {
     if (activeRegex && b.creator_uid === 'guide') return false;
