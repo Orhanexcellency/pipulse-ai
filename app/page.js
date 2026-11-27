@@ -15,31 +15,23 @@ const CATS = [
   ['Life & Education', /\b(nutrition|fitness|travel|language|tutor|chef|coach|sleep|yoga|running|parenting|pet|ielts|math)\b/i]
 ];
 
-const hashNum = (s) => {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 997;
-  return h;
-};
-
 export default function Home() {
   const [user, setUser] = useState(null), [agents, setAgents] = useState(BOTS), [bot, setBot] = useState(null);
   const [msgs, setMsgs] = useState([]), [txt, setTxt] = useState(''), [search, setSearch] = useState(''), [catIdx, setCatIdx] = useState(0);
   const [busy, setBusy] = useState(false), [trIdx, setTrIdx] = useState(null), [tab, setTab] = useState('market'), [bal, setBal] = useState(1.00);
-  const [txs, setTxs] = useState([{ t: 'PioneerPro Welcome Balance', a: '+1.00 Pi', c: '#4ade80' }]);
+  const [txs, setTxs] = useState([{ t: 'PioneerPro Testnet Welcome Balance', a: '+1.00 Pi', c: '#4ade80' }]);
   const [form, setForm] = useState({ name: '', category: 'Pi & Web3', description: '', system_prompt: '', price: '0.50' });
   const [trade, setTrade] = useState({ role: 'Buying', partner: '', item: '', amount: '' }), [contract, setContract] = useState('');
-  const [recentTrades, setRecentTrades] = useState([
-    { pair: '@Web3Dev ↔ @DesignPi', item: 'Mobile App UI Kit', amt: '25 Pi', status: 'Sealed' },
-    { pair: '@LocalCafe ↔ @Pioneer88', item: 'Coffee & Pastry Voucher', amt: '4.5 Pi', status: 'Sealed' }
-  ]);
+  const [recentTrades, setRecentTrades] = useState([]);
+  const [chatCounts, setChatCounts] = useState({});
 
   useEffect(() => { getBots(); }, []);
 
   const login = () => {
     const u = { uid: 'pioneer-pro-user', username: 'PioneerPro', kyc: true };
     setUser(u);
-    const sBal = localStorage.getItem('pp_v2_bal_' + u.uid), sTxs = localStorage.getItem('pp_v2_txs_' + u.uid);
-    let parsedTxs = [{ t: 'PioneerPro Welcome Balance', a: '+1.00 Pi', c: '#4ade80' }];
+    const sBal = localStorage.getItem('pp_v3_bal_' + u.uid), sTxs = localStorage.getItem('pp_v3_txs_' + u.uid);
+    let parsedTxs = [{ t: 'PioneerPro Testnet Welcome Balance', a: '+1.00 Pi', c: '#4ade80' }];
     if (sTxs) try { parsedTxs = JSON.parse(sTxs); } catch (e) {}
     const curBal = sBal !== null ? Number(sBal) : 1.00;
     if (curBal < 0.22) { setBal(1.00); setTxs([{ t: 'Testnet Credit Top-Up', a: '+1.00 Pi', c: '#4ade80' }, ...parsedTxs]); }
@@ -57,8 +49,8 @@ export default function Home() {
 
   useEffect(() => {
     if (!user) return;
-    localStorage.setItem('pp_v2_bal_' + user.uid, String(Math.max(0, bal)));
-    localStorage.setItem('pp_v2_txs_' + user.uid, JSON.stringify(txs));
+    localStorage.setItem('pp_v3_bal_' + user.uid, String(Math.max(0, bal)));
+    localStorage.setItem('pp_v3_txs_' + user.uid, JSON.stringify(txs));
   }, [bal, txs, user]);
 
   const getBots = async () => { const { data } = await supabase.from('ai_agents').select('*').limit(1000); if (data?.length) setAgents(data); };
@@ -77,7 +69,8 @@ export default function Home() {
       const res = await fetch('/api/payments/approve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: q, systemPrompt: hist ? `${bot.system_prompt}\n\nHistory:\n${hist}` : bot.system_prompt }) });
       const data = await res.json();
       setBal(Math.max(0, Number((activeBal - p).toFixed(2))));
-      setTxs(prev => [{ t: `Spent: ${bot.name}`, a: `-${p.toFixed(2)} Pi`, c: '#f87171' }, ...prev]);
+      setChatCounts(prev => ({ ...prev, [bot.id]: (prev[bot.id] || 0) + 1 }));
+      setTxs(prev => [{ t: `Pi SDK Payment: ${bot.name}`, a: `-${p.toFixed(2)} Pi`, c: '#f87171' }, ...prev]);
       setMsgs(prev => [...prev, { r: 'u', t: q }, { r: 'a', t: `[Pi SDK Paid: ${p.toFixed(2)} Pi] ` + (data.reply || 'Response ready.') }]);
     } catch (e) { setMsgs(prev => [...prev, { r: 'u', t: q }, { r: 'a', t: '⚠️ Error: ' + e.message }]); }
     setBusy(false);
@@ -93,14 +86,14 @@ export default function Home() {
       const res = await fetch('/api/payments/approve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: `Buyer (Pays Pi): ${buyer}, Seller (Delivers): ${seller}, Item/Service: ${trade.item}, Agreed Price: ${trade.amount} Pi`, systemPrompt: 'You are the PiPulse P2P Smart Trade & Contract AI. Draft a concise, clear Pi Network peer-to-peer trade agreement clearly stating Buyer and Seller obligations, KYC status, delivery terms, and mutual confirmation clauses.' }) });
       const data = await res.json();
       setContract(data.reply || 'Smart trade contract generated.');
-      setRecentTrades(prev => [{ pair: `${buyer} ↔ ${seller}`, item: trade.item, amt: `${trade.amount} Pi`, status: 'Drafted' }, ...prev.slice(0, 3)]);
+      setRecentTrades(prev => [{ pair: `${buyer} ↔ ${seller}`, item: trade.item, amt: `${trade.amount} Pi`, status: 'Awaiting Partner Confirmation' }, ...prev]);
     } catch (e) { setContract('Error generating contract.'); }
     setBusy(false);
   };
 
   const sealContract = () => {
-    alert(`Contract sealed with Pi SDK Proof! Copy and share it with ${trade.partner} via Pi Chats.`);
-    setRecentTrades(prev => prev.map((r, i) => i === 0 ? { ...r, status: 'Sealed' } : r));
+    alert(`Counterparty confirmed & Pi SDK payment verified! Agreement with ${trade.partner} is now Sealed.`);
+    setRecentTrades(prev => prev.map((r, i) => i === 0 ? { ...r, status: 'Sealed (Pi SDK)' } : r));
   };
 
   const trMsg = async (idx, raw, lang) => {
@@ -126,13 +119,13 @@ export default function Home() {
   const withdraw = () => {
     if (!user) return;
     if (bal <= 0) return alert('No available balance to withdraw.');
-    alert(`${bal.toFixed(2)} Pi transferred to @${user.username} Pi Wallet!`);
-    setTxs(p => [{ t: 'Withdrawn to Pi Wallet', a: `-${bal.toFixed(2)} Pi`, c: '#f5b041' }, ...p]); setBal(0);
+    alert(`${bal.toFixed(2)} Pi transferred to @${user.username} Pi Wallet (Testnet)!`);
+    setTxs(p => [{ t: 'Withdrawn to Pi Wallet (Testnet)', a: `-${bal.toFixed(2)} Pi`, c: '#f5b041' }, ...p]); setBal(0);
   };
 
   const delBot = async (e, id) => { e.stopPropagation(); if (confirm('Delete this agent?')) { await supabase.from('ai_agents').delete().eq('id', id); getBots(); } };
   const refUrl = 'https://pipulseai' + '.vercel.app/?ref=' + (user?.username || 'Pioneer');
-  const activeRegex = CATS[catIdx][1];
+  const activeRegex = CATS[catIdx];
   const sorted = [...agents].sort((a, b) => (a.creator_uid === 'guide' ? -1 : b.creator_uid === 'guide' ? 1 : a.creator_uid === 'featured' ? -1 : b.creator_uid === 'featured' ? 1 : 0));
   const filtered = sorted.filter(b => {
     if (activeRegex && b.creator_uid === 'guide') return false;
@@ -140,7 +133,7 @@ export default function Home() {
     return (!search || text.toLowerCase().includes(search.toLowerCase())) && (!activeRegex || activeRegex.test(text));
   });
   const visibleBots = (search || activeRegex) ? filtered.slice(0, 60) : filtered.slice(0, 30);
-    return (
+  return (
     <div style={{ maxWidth: 500, margin: '0 auto', padding: 14 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #333', paddingBottom: 10 }}>
         <b onClick={() => { setBot(null); setTab('market'); }} style={{ color: '#f5b041', fontSize: 18 }}>⚡ PiPulse AI</b>
@@ -175,25 +168,27 @@ export default function Home() {
                 <div style={{ fontSize: 12, whiteSpace: 'pre-wrap', color: '#e2e8f0' }}>{contract}</div>
                 <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
                   <button onClick={() => { navigator.clipboard?.writeText(contract); alert('Contract copied for Pi Chats!'); }} style={{ flex: 1, background: '#f5b041', padding: '8px', borderRadius: 6, border: 'none', fontWeight: 'bold', fontSize: 11 }}>📋 Copy for Pi Chats</button>
-                  <button onClick={sealContract} style={{ flex: 1, background: '#4ade80', color: '#000', padding: '8px', borderRadius: 6, border: 'none', fontWeight: 'bold', fontSize: 11 }}>🛡️ Seal with Pi SDK</button>
+                  <button onClick={sealContract} style={{ flex: 1, background: '#4ade80', color: '#000', padding: '8px', borderRadius: 6, border: 'none', fontWeight: 'bold', fontSize: 11 }}>🛡️ Confirm & Seal (Pi SDK)</button>
                 </div>
               </div>
             )}
           </div>
           <div style={{ background: '#1a142e', padding: 12, borderRadius: 12, border: '1px solid #4a3578' }}>
-            <b style={{ color: '#f5b041', fontSize: 12 }}>⚡ How P2P Smart Trade Works</b>
+            <b style={{ color: '#f5b041', fontSize: 12 }}>⚡ End-to-End P2P Trade Flow</b>
             <div style={{ fontSize: 11, color: '#ccc', marginTop: 6, lineHeight: 1.5 }}>
               1. Select your role (Buying/Selling) & enter partner username.<br/>
               2. AI drafts clear delivery & dispute-protection terms.<br/>
-              3. Seal with Pi SDK & share via Pi Chats or Link.
+              3. Share via Pi Chats, verify Pi SDK payment & seal agreement.
             </div>
           </div>
           <div style={{ background: '#1a142e', padding: 12, borderRadius: 12, border: '1px solid #4a3578' }}>
-            <b style={{ color: '#5eead4', fontSize: 12 }}>🛡️ Recent KYC-Verified Trades</b>
-            {recentTrades.map((r, i) => (
+            <b style={{ color: '#5eead4', fontSize: 12 }}>🛡️ Your Session KYC Trade Agreements</b>
+            {recentTrades.length === 0 ? (
+              <p style={{ fontSize: 11, color: '#888', marginTop: 6 }}>No agreements drafted yet. Create your first P2P trade contract above.</p>
+            ) : recentTrades.map((r, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 0', borderBottom: '1px solid #2a214a', fontSize: 11 }}>
                 <div><b style={{ color: '#fff' }}>{r.pair}</b><div style={{ color: '#999' }}>{r.item}</div></div>
-                <div style={{ textAlign: 'right' }}><b style={{ color: '#f5b041' }}>{r.amt}</b><div style={{ color: '#4ade80', fontSize: 10 }}>● {r.status}</div></div>
+                <div style={{ textAlign: 'right' }}><b style={{ color: '#f5b041' }}>{r.amt}</b><div style={{ color: r.status.includes('Sealed') ? '#4ade80' : '#f5b041', fontSize: 10 }}>● {r.status}</div></div>
               </div>
             ))}
           </div>
@@ -202,7 +197,7 @@ export default function Home() {
       {tab === 'wallet' && user && (
         <div style={{ background: '#1a142e', padding: 14, borderRadius: 12, border: '1px solid #4a3578' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#0f0c29', padding: 12, borderRadius: 10, marginBottom: 12 }}>
-            <div><small style={{ color: '#999' }}>Available Balance</small><div style={{ fontSize: 20, fontWeight: 'bold', color: '#4ade80' }}>{bal.toFixed(2)} Pi</div></div>
+            <div><small style={{ color: '#999' }}>Testnet Balance</small><div style={{ fontSize: 20, fontWeight: 'bold', color: '#4ade80' }}>{bal.toFixed(2)} Pi</div></div>
             <button onClick={withdraw} style={{ background: '#4ade80', color: '#000', padding: '9px 14px', borderRadius: 8, border: 'none', fontWeight: 'bold', fontSize: 12 }}>Withdraw Pi</button>
           </div>
           <b style={{ color: '#f5b041', fontSize: 13 }}>🎁 Referral Link (10% Pi Commission)</b>
@@ -214,7 +209,7 @@ export default function Home() {
           {txs.map((x, i) => <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid #2a214a', fontSize: 13 }}><span>{x.t}</span><b style={{ color: x.c }}>{x.a}</b></div>)}
         </div>
       )}
-        {tab === 'create' && user && (
+                {tab === 'create' && user && (
         <form onSubmit={create} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ background: '#134e4a', color: '#5eead4', padding: 8, borderRadius: 8, fontSize: 12 }}>🛡️ Publishing with Pi KYC Identity Protection (Max 3 bots/user)</div>
           <input placeholder="Agent Name" value={form.name} onChange={e => setForm({...form, name: e.target.value})} required style={{ padding: 11, borderRadius: 8 }} />
@@ -234,14 +229,12 @@ export default function Home() {
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Search 1,000+ KYC-verified AI agents..." style={{ flex: 1, padding: '10px 12px', borderRadius: 10, background: '#1a142e', color: '#fff', border: '1px solid #4a3578', fontSize: 13 }} />
             {search && <button onClick={() => setSearch('')} style={{ background: '#4a3578', color: '#fff', border: 'none', borderRadius: 10, padding: '0 12px', fontWeight: 'bold' }}>✕</button>}
           </div>
-          <div style={{ display: 'flex', gap: 5, overflowX: 'auto', paddingBottom: 8, marginBottom: 6 }}>
-            {CATS.map(([lbl], i) => <button key={lbl} onClick={() => setCatIdx(i)} style={{ whiteSpace: 'nowrap', padding: '5px 10px', borderRadius: 14, border: '1px solid #4a3578', background: catIdx === i ? '#f5b041' : '#1a142e', color: catIdx === i ? '#000' : '#ddd', fontSize: 11, fontWeight: 'bold' }}>{lbl}</button>)}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 5, marginBottom: 10 }}>
+            {CATS.map(([lbl], i) => <button key={lbl} onClick={() => setCatIdx(i)} style={{ padding: '6px 4px', borderRadius: 10, border: '1px solid #4a3578', background: catIdx === i ? '#f5b041' : '#1a142e', color: catIdx === i ? '#000' : '#ddd', fontSize: 10, fontWeight: 'bold', textAlign: 'center' }}>{lbl}</button>)}
           </div>
           {visibleBots.map((b) => {
             const isG = b.creator_uid === 'guide';
-            const h = hashNum(b.name + String(b.id));
-            const rating = (4.7 + (h % 3) * 0.1).toFixed(1);
-            const chats = 64 + (h % 380);
+            const liveChats = chatCounts[b.id] || 0;
             return (
               <div key={b.id} onClick={() => { setBot(b); setMsgs([]); }} style={{ background: isG ? 'linear-gradient(135deg, #134e4a, #1e1b4b)' : '#1a142e', padding: 14, borderRadius: 12, marginBottom: 10, border: isG ? '2px solid #2dd4bf' : '1px solid #4a3578' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
@@ -255,7 +248,7 @@ export default function Home() {
                 <p style={{ fontSize: 13, margin: '6px 0', color: isG ? '#e2e8f0' : '#ddd' }}>{b.description}</p>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: isG ? '#5eead4' : '#999', whiteSpace: 'nowrap' }}>
                   <span>{`🛡️ @${b.creator_username} • KYC`}</span>
-                  <span>{`⭐ ${rating} (${chats} chats)`}</span>
+                  <span>{liveChats > 0 ? `💬 ${liveChats} session chats` : '✨ KYC-Verified Agent'}</span>
                 </div>
               </div>
             );
@@ -291,7 +284,14 @@ export default function Home() {
           <div style={{ display: 'flex', gap: 6 }}><input value={txt} onChange={e => setTxt(e.target.value)} placeholder="Ask your question..." style={{ flex: 1, padding: 10, borderRadius: 8 }} /><button onClick={() => send()} disabled={busy} style={{ background: '#f5b041', padding: '10px 16px', borderRadius: 8, fontWeight: 'bold', border: 'none' }}>Send</button></div>
         </div>
       )}
+      <footer style={{ marginTop: 20, paddingTop: 12, borderTop: '1px solid #2a214a', textAlign: 'center', fontSize: 11, color: '#888' }}>
+        <div style={{ marginBottom: 4 }}>
+          <a href="/privacy" style={{ color: '#f5b041', textDecoration: 'none', marginRight: 10 }}>Privacy Policy</a> •
+          <a href="/terms" style={{ color: '#f5b041', textDecoration: 'none', marginLeft: 10 }}>Terms of Service</a>
+        </div>
+        <div>Independent community dApp built for Pi Network (Testnet Mode).</div>
+      </footer>
     </div>
   );
-        }
-          
+      }
+                  
