@@ -229,7 +229,7 @@ export default function Home() {
       {tab === 'market' && !bot && (
         <div>
           <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Search 1,000+ KYC-verified AI agents..." style={{ flex: 1, padding: '10px 12px', borderRadius: 10, background: '#1a142e', color: '#fff', border: '1px solid #4a3578', fontSize: 13 }} />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Search curated KYC-verified AI agents..." " style={{ flex: 1, padding: '10px 12px', borderRadius: 10, background: '#1a142e', color: '#fff', border: '1px solid #4a3578', fontSize: 13 }} />
             {search && <button onClick={() => setSearch('')} style={{ background: '#4a3578', color: '#fff', border: 'none', borderRadius: 10, padding: '0 12px', fontWeight: 'bold' }}>✕</button>}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 5, marginBottom: 10 }}>
