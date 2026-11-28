@@ -1,5 +1,5 @@
 export async function GET() {
-  return new Response('1ba8586cc12595c9369360adcaa4d539b23a505258c25321a8eb3cb3049891eed2ee1272131796a85c1628d3544843397eb986afbdd335e141efa1f7cc11f6eb', {
+  return new Response('b85663267be7a76ecafdb64a093122b4f19f89c471749f9757d50035925c9d7c2f70040aaca2152e12b9aa2f1feddd12ae37eb421ae66895fd47e5bbfb9cf96', {
     headers: { 'Content-Type': 'text/plain' },
   });
 }
