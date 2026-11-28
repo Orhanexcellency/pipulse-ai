@@ -120,7 +120,7 @@ export default function Home() {
     setBusy(false);
   };
 
-  const makeTrade = async (e) => {
+    const makeTrade = async (e) => {
     e.preventDefault();
     if (!user) { if (confirm('Please sign in with Pi Wallet first. Sign in now?')) login(); return; }
     setBusy(true); setContractData(null);
@@ -129,6 +129,16 @@ export default function Home() {
     const proofId = `#PA-${Date.now().toString().slice(-6)}`;
     const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
     try {
+      const res = await fetch('/api/payments/approve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: `Buyer (Pays Pi): ${buyer}, Seller (Delivers): ${seller}, Item/Service: ${trade.item}, Agreed Price: ${trade.amount} Pi`, systemPrompt: 'You are the PulseAI Non-Custodial P2P Smart Agreement AI. Draft 4 concise numbered clauses covering Delivery Proof, Direct Peer-to-Peer Pi Wallet Transfer, Anti-Scam Verification, and Mutual Confirmation via Pi Chats. STRICT RULE: NEVER use the words escrow, platform mediation, binding decision, or releasing funds. Explicitly state that PulseAI holds zero user funds and all transfers occur via Direct Peer-to-Peer Pi Wallet Transfer with Mutual Confirmation via Pi Chats.' }) });
+      const data = await res.json();
+      const rawBody = data.reply || '1. Seller shares delivery proof via Pi Chats.\n2. Buyer executes Direct Peer-to-Peer Pi Wallet Transfer upon Mutual Confirmation via Pi Chats.';
+      const body = rawBody.replace(/escrow/gi, 'Direct Peer-to-Peer Pi Wallet').replace(/platform's mediation service|platform mediation/gi, 'Mutual Confirmation via Pi Chats').replace(/releasing funds|funds are released/gi, 'direct peer-to-peer settlement');
+      setContractData({ proofId, timestamp, buyer, seller, item: trade.item, amount: trade.amount, body });
+      setRecentTrades(prev => [{ pair: `${buyer} ↔ ${seller}`, item: trade.item, amt: `${trade.amount} Pi`, status: 'Awaiting Partner Confirmation' }, ...prev]);
+    } catch (e) { alert('Error generating contract.'); }
+    setBusy(false);
+  };
+ {
       const res = await fetch('/api/payments/approve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: `Buyer (Pays Pi): ${buyer}, Seller (Delivers): ${seller}, Item/Service: ${trade.item}, Agreed Price: ${trade.amount} Pi`, systemPrompt: 'You are the PulseAI P2P Smart Trade & Contract AI. Draft 4 concise numbered clauses covering Delivery Proof, Direct Pi Wallet Payment Timing, Anti-Scam Verification, and Dispute Resolution. Do not repeat headers.' }) });
       const data = await res.json();
       const body = data.reply || '1. Seller provides delivery proof in Pi Chats.\n2. Buyer transfers agreed Pi directly via Pi Wallet.';
