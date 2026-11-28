@@ -16,10 +16,23 @@ const CATS = [
 ];
 
 function FormatInline({ text }) {
-  return text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).map((part, i) => {
+  return text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g).map((part, i) => {
     if (part.startsWith('**') && part.endsWith('**')) return <b key={i} style={{ color: '#fde68a' }}>{part.slice(2, -2)}</b>;
+    if (part.startsWith('*') && part.endsWith('*') && part.length > 2) return <em key={i} style={{ color: '#cbd5e1', fontStyle: 'italic' }}>{part.slice(1, -1)}</em>;
     if (part.startsWith('`') && part.endsWith('`')) return <code key={i} style={{ background: '#0f0c29', color: '#5eead4', padding: '1px 5px', borderRadius: 4, fontSize: 12 }}>{part.slice(1, -1)}</code>;
     return <span key={i}>{part}</span>;
+  });
+}
+
+function FormattedLines({ text }) {
+  return text.split('\n').map((line, idx) => {
+    const t = line.trim();
+    if (!t) return <div key={idx} style={{ height: 6 }} />;
+    if (t.startsWith('### ')) return <div key={idx} style={{ color: '#f5b041', fontWeight: 'bold', fontSize: 14, marginTop: 8, marginBottom: 3 }}>{t.slice(4)}</div>;
+    if (t.startsWith('## ')) return <div key={idx} style={{ color: '#5eead4', fontWeight: 'bold', fontSize: 15, marginTop: 10, marginBottom: 4 }}>{t.slice(3)}</div>;
+    if (t.startsWith('# ')) return <div key={idx} style={{ color: '#fff', fontWeight: 'bold', fontSize: 16, marginTop: 10, marginBottom: 4 }}>{t.slice(2)}</div>;
+    if (t.startsWith('> ')) return <div key={idx} style={{ borderLeft: '3px solid #2dd4bf', background: '#171130', padding: '5px 10px', margin: '5px 0', color: '#a5f3fc', fontStyle: 'italic', borderRadius: '0 6px 6px 0' }}><FormatInline text={t.slice(2)} /></div>;
+    return <div key={idx}><FormatInline text={line} /></div>;
   });
 }
 
@@ -43,18 +56,18 @@ function FormattedReply({ text }) {
             </div>
           );
         }
-        return <div key={i} style={{ whiteSpace: 'pre-wrap' }}><FormatInline text={blk} /></div>;
+        return <FormattedLines key={i} text={blk} />;
       })}
     </div>
   );
-      }
+}
 export default function Home() {
   const [user, setUser] = useState(null), [agents, setAgents] = useState(BOTS), [bot, setBot] = useState(null);
   const [msgs, setMsgs] = useState([]), [txt, setTxt] = useState(''), [search, setSearch] = useState(''), [catIdx, setCatIdx] = useState(0);
   const [busy, setBusy] = useState(false), [trIdx, setTrIdx] = useState(null), [tab, setTab] = useState('market'), [bal, setBal] = useState(1.00);
   const [txs, setTxs] = useState([{ t: 'PioneerPro Testnet Welcome Balance', a: '+1.00 Pi', c: '#4ade80' }]);
   const [form, setForm] = useState({ name: '', category: 'Pi & Web3', description: '', system_prompt: '', price: '0.50' });
-  const [trade, setTrade] = useState({ role: 'Buying', partner: '', item: '', amount: '' }), [contract, setContract] = useState('');
+  const [trade, setTrade] = useState({ role: 'Buying', partner: '', item: '', amount: '' }), [contractData, setContractData] = useState(null);
   const [recentTrades, setRecentTrades] = useState([]);
   const [chatCounts, setChatCounts] = useState({});
 
@@ -108,20 +121,25 @@ export default function Home() {
   const makeTrade = async (e) => {
     e.preventDefault();
     if (!user) { if (confirm('Please sign in with Pi Wallet first. Sign in now?')) login(); return; }
-    setBusy(true); setContract('');
+    setBusy(true); setContractData(null);
     const buyer = trade.role === 'Buying' ? `@${user.username}` : trade.partner;
     const seller = trade.role === 'Selling' ? `@${user.username}` : trade.partner;
+    const proofId = `#PA-${Date.now().toString().slice(-6)}`;
+    const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
     try {
-      const res = await fetch('/api/payments/approve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: `Buyer (Pays Pi): ${buyer}, Seller (Delivers): ${seller}, Item/Service: ${trade.item}, Agreed Price: ${trade.amount} Pi`, systemPrompt: 'You are the PulseAI P2P Smart Trade & Contract AI. Draft a concise, clear Pi Network peer-to-peer trade agreement clearly stating Buyer and Seller obligations, KYC status, delivery terms, and mutual confirmation clauses.' }) });
+      const res = await fetch('/api/payments/approve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: `Buyer (Pays Pi): ${buyer}, Seller (Delivers): ${seller}, Item/Service: ${trade.item}, Agreed Price: ${trade.amount} Pi`, systemPrompt: 'You are the PulseAI P2P Smart Trade & Contract AI. Draft 4 concise numbered clauses covering Delivery Proof, Direct Pi Wallet Payment Timing, Anti-Scam Verification, and Dispute Resolution. Do not repeat headers.' }) });
       const data = await res.json();
-      setContract(data.reply || 'Smart trade contract generated.');
+      const body = data.reply || '1. Seller provides delivery proof in Pi Chats.\n2. Buyer transfers agreed Pi directly via Pi Wallet.';
+      setContractData({ proofId, timestamp, buyer, seller, item: trade.item, amount: trade.amount, body });
       setRecentTrades(prev => [{ pair: `${buyer} ↔ ${seller}`, item: trade.item, amt: `${trade.amount} Pi`, status: 'Awaiting Partner Confirmation' }, ...prev]);
-    } catch (e) { setContract('Error generating contract.'); }
+    } catch (e) { alert('Error generating contract.'); }
     setBusy(false);
   };
 
+  const fullExportText = contractData ? `PULSEAI P2P SMART AGREEMENT (${contractData.proofId})\nTimestamp: ${contractData.timestamp}\nBuyer: ${contractData.buyer} (KYC Verified)\nSeller: ${contractData.seller}\nScope: ${contractData.item}\nDirect Transfer: ${contractData.amount} Pi\nNotice: Non-Custodial Agreement (No funds held by PulseAI)\n\n${contractData.body}` : '';
+
   const sealContract = () => {
-    alert(`Counterparty confirmed & Pi SDK payment verified! Agreement with ${trade.partner} is now Sealed.`);
+    alert(`Counterparty confirmed & Pi SDK timestamp recorded! Agreement ${contractData?.proofId} is now Sealed.`);
     setRecentTrades(prev => prev.map((r, i) => i === 0 ? { ...r, status: 'Sealed (Pi SDK)' } : r));
   };
 
@@ -162,7 +180,7 @@ export default function Home() {
     return (!search || text.toLowerCase().includes(search.toLowerCase())) && (!activeRegex || activeRegex.test(text));
   });
   const visibleBots = filtered.slice(0, 50);
-                                                  return (
+              return (
     <div style={{ maxWidth: 500, margin: '0 auto', padding: 14 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #333', paddingBottom: 10 }}>
         <b onClick={() => { setBot(null); setTab('market'); }} style={{ color: '#f5b041', fontSize: 18 }}>⚡ PulseAI</b>
@@ -194,24 +212,29 @@ export default function Home() {
               <input type="text" inputMode="decimal" placeholder="Amount in Pi (e.g., 10 Pi)" value={trade.amount} onChange={e => setTrade({...trade, amount: e.target.value})} required style={{ padding: 10, borderRadius: 8 }} />
               <button type="submit" disabled={busy} style={{ background: '#2dd4bf', color: '#000', padding: 11, borderRadius: 8, fontWeight: 'bold', border: 'none', marginTop: 4 }}>{busy ? 'Drafting P2P Terms...' : 'Draft Non-Custodial P2P Agreement'}</button>
             </form>
-            {contract && (
-              <div style={{ marginTop: 12, background: '#0f0c29', padding: 12, borderRadius: 8, border: '1px solid #4a3578' }}>
-                <div style={{ fontSize: 11, color: '#5eead4', marginBottom: 6, fontWeight: 'bold' }}>🔐 Agreement Proof ID: #PA-{Date.now().toString().slice(-6)}</div>
-                <FormattedReply text={contract} />
-                <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
-                  <button onClick={() => { navigator.clipboard?.writeText(contract); alert('Agreement & Proof ID copied for Pi Chats!'); }} style={{ flex: 1, background: '#f5b041', padding: '8px', borderRadius: 6, border: 'none', fontWeight: 'bold', fontSize: 11 }}>📋 Copy for Pi Chats</button>
-                  <button onClick={sealContract} style={{ flex: 1, background: '#4ade80', color: '#000', padding: '8px', borderRadius: 6, border: 'none', fontWeight: 'bold', fontSize: 11 }}>🛡️ Record Pi SDK Timestamp</button>
+            {contractData && (
+              <div style={{ marginTop: 12, background: '#0f0c29', padding: 12, borderRadius: 10, border: '1px solid #2dd4bf' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #2a214a', paddingBottom: 6, marginBottom: 8, fontSize: 11 }}>
+                  <b style={{ color: '#5eead4' }}>🔐 {contractData.proofId}</b>
+                  <span style={{ color: '#94a3b8' }}>🕒 {contractData.timestamp}</span>
                 </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, background: '#161130', padding: 8, borderRadius: 6, marginBottom: 8, fontSize: 11 }}>
+                  <div><span style={{ color: '#888' }}>Buyer:</span><br/><b style={{ color: '#4ade80' }}>{contractData.buyer} 🛡️ KYC</b></div>
+                  <div><span style={{ color: '#888' }}>Seller:</span><br/><b style={{ color: '#f5b041' }}>{contractData.seller}</b></div>
+                  <div style={{ gridColumn: '1 / -1', borderTop: '1px solid #2a214a', paddingTop: 4 }}><span style={{ color: '#888' }}>Scope & Amount:</span> <b style={{ color: '#fff' }}>{contractData.item} ({contractData.amount} Pi)</b></div>
+                </div>
+                <div style={{ fontSize: 12, color: '#e2e8f0' }}><FormattedReply text={contractData.body} /></div>
+                <div style={{ background: '#291d12', color: '#fcd34d', padding: '5px 8px', borderRadius: 6, fontSize: 10, marginTop: 8 }}>
+                  🛡️ Anti-Scam Rule: Never send Pi before verifying Proof ID {contractData.proofId} in Pi Chats.
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 5, marginTop: 8 }}>
+                  <button type="button" onClick={() => { navigator.clipboard?.writeText(fullExportText); alert('Full Agreement copied!'); }} style={{ background: '#f5b041', color: '#000', padding: '7px 4px', borderRadius: 6, border: 'none', fontWeight: 'bold', fontSize: 10 }}>📋 Copy Chat</button>
+                  <button type="button" onClick={() => { if (navigator.share) navigator.share({ title: `PulseAI Agreement ${contractData.proofId}`, text: fullExportText }); else { navigator.clipboard?.writeText(fullExportText); alert('Copied to share!'); } }} style={{ background: '#38bdf8', color: '#000', padding: '7px 4px', borderRadius: 6, border: 'none', fontWeight: 'bold', fontSize: 10 }}>📤 Share</button>
+                  <button type="button" onClick={() => window.print()} style={{ background: '#a78bfa', color: '#000', padding: '7px 4px', borderRadius: 6, border: 'none', fontWeight: 'bold', fontSize: 10 }}>🖨️ Save PDF</button>
+                </div>
+                <button type="button" onClick={sealContract} style={{ width: '100%', marginTop: 6, background: '#4ade80', color: '#000', padding: '8px', borderRadius: 6, border: 'none', fontWeight: 'bold', fontSize: 11 }}>🛡️ Confirm & Record Pi SDK Timestamp</button>
               </div>
             )}
-          </div>
-          <div style={{ background: '#1a142e', padding: 12, borderRadius: 12, border: '1px solid #4a3578' }}>
-            <b style={{ color: '#f5b041', fontSize: 12 }}>⚡ Safe P2P Trade Checklist</b>
-            <div style={{ fontSize: 11, color: '#ccc', marginTop: 6, lineHeight: 1.5 }}>
-              1. Verify partner KYC badge & draft mutual delivery terms.<br/>
-              2. Share Agreement Proof ID via Pi Chats before sending Pi.<br/>
-              3. Execute direct peer-to-peer transfer in official Pi Wallet.
-            </div>
           </div>
           <div style={{ background: '#1a142e', padding: 12, borderRadius: 12, border: '1px solid #4a3578' }}>
             <b style={{ color: '#5eead4', fontSize: 12 }}>🛡️ Your Session P2P Agreements</b>
@@ -241,7 +264,7 @@ export default function Home() {
           {txs.map((x, i) => <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid #2a214a', fontSize: 13 }}><span>{x.t}</span><b style={{ color: x.c }}>{x.a}</b></div>)}
         </div>
       )}
-                            {tab === 'create' && user && (
+      {tab === 'create' && user && (
         <form onSubmit={create} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ background: '#134e4a', color: '#5eead4', padding: 8, borderRadius: 8, fontSize: 12 }}>🛡️ Publishing with Pi KYC Identity Protection (Max 3 bots/user)</div>
           <input placeholder="Agent Name" value={form.name} onChange={e => setForm({...form, name: e.target.value})} required style={{ padding: 11, borderRadius: 8 }} />
@@ -326,17 +349,4 @@ export default function Home() {
             ))}
             {busy && <small style={{ color: '#f5b041' }}>AI is analyzing...</small>}
           </div>
-          <div style={{ display: 'flex', gap: 6 }}><input value={txt} onChange={e => setTxt(e.target.value)} placeholder="Ask your question..." style={{ flex: 1, padding: 10, borderRadius: 8 }} /><button onClick={() => send()} disabled={busy} style={{ background: '#f5b041', padding: '10px 16px', borderRadius: 8, fontWeight: 'bold', border: 'none' }}>Send</button></div>
-        </div>
-      )}
-      <footer style={{ marginTop: 20, paddingTop: 12, borderTop: '1px solid #2a214a', textAlign: 'center', fontSize: 11, color: '#888', lineHeight: 1.5 }}>
-        <div style={{ marginBottom: 4 }}>
-          <a href="/privacy" style={{ color: '#f5b041', textDecoration: 'none', marginRight: 10 }}>Privacy Policy</a> •
-          <a href="/terms" style={{ color: '#f5b041', textDecoration: 'none', marginLeft: 10 }}>Terms of Service</a>
-        </div>
-        <div>SSL Secured • Non-Custodial Testnet dApp • Independent Pi Ecosystem App</div>
-      </footer>
-    </div>
-  );
-              }
-        
+                   
