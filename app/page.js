@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 
 const BOTS = [
-  { id: '1', creator_uid: 'guide', creator_username: 'PulseAI_Official', name: '🧭 AI Concierge: Find Your Best Bot!', description: 'Not sure which agent to pick? Tell me your goal, and I will match you with the exact expert and prompt.', system_prompt: 'You are the PulseAI Concierge. Recommend the best bot category and prompt for the user goal.', price_per_msg: 0.22 }
+  { id: '1', creator_uid: 'guide', creator_username: 'PulseAI_Official', name: '🧭 AI Concierge: Find Your Best Agent', description: 'Tell me your goal and I will match you with the right specialist among our 25 curated agents.', system_prompt: 'You are the PulseAI Concierge. Recommend the best bot category and prompt for the user goal.', price_per_msg: 0.22 }
 ];
 const LANGS = [['🇬🇧 EN','English'],['🇹🇷 TR','Turkish'],['🇨🇳 ZH','Chinese'],['🇪🇸 ES','Spanish'],['🇮🇳 HI','Hindi'],['🇻🇳 VI','Vietnamese'],['🇰🇷 KO','Korean'],['🇸🇦 AR','Arabic'],['🇮🇩 ID','Indonesian'],['🇷🇺 RU','Russian']];
 const CATS = [
@@ -53,7 +53,7 @@ export default function Home() {
     localStorage.setItem('pp_v3_txs_' + user.uid, JSON.stringify(txs));
   }, [bal, txs, user]);
 
-  const getBots = async () => { const { data } = await supabase.from('ai_agents').select('*').limit(1000); if (data?.length) setAgents(data); };
+  const getBots = async () => { const { data } = await supabase.from('ai_agents').select('*').limit(100); if (data?.length) setAgents(data); };
 
   const send = async (preset) => {
     const q = (typeof preset === 'string' ? preset : txt).trim();
@@ -132,8 +132,8 @@ export default function Home() {
     const text = b.name + ' ' + b.description;
     return (!search || text.toLowerCase().includes(search.toLowerCase())) && (!activeRegex || activeRegex.test(text));
   });
-  const visibleBots = (search || activeRegex) ? filtered.slice(0, 60) : filtered.slice(0, 30);
-    return (
+  const visibleBots = filtered.slice(0, 50);
+  return (
     <div style={{ maxWidth: 500, margin: '0 auto', padding: 14 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #333', paddingBottom: 10 }}>
         <b onClick={() => { setBot(null); setTab('market'); }} style={{ color: '#f5b041', fontSize: 18 }}>⚡ PulseAI</b>
@@ -212,7 +212,7 @@ export default function Home() {
           {txs.map((x, i) => <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid #2a214a', fontSize: 13 }}><span>{x.t}</span><b style={{ color: x.c }}>{x.a}</b></div>)}
         </div>
       )}
-                    {tab === 'create' && user && (
+                {tab === 'create' && user && (
         <form onSubmit={create} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ background: '#134e4a', color: '#5eead4', padding: 8, borderRadius: 8, fontSize: 12 }}>🛡️ Publishing with Pi KYC Identity Protection (Max 3 bots/user)</div>
           <input placeholder="Agent Name" value={form.name} onChange={e => setForm({...form, name: e.target.value})} required style={{ padding: 11, borderRadius: 8 }} />
@@ -229,8 +229,7 @@ export default function Home() {
       {tab === 'market' && !bot && (
         <div>
           <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Search curated KYC-verified AI agents..."
-        " style={{ flex: 1, padding: '10px 12px', borderRadius: 10, background: '#1a142e', color: '#fff', border: '1px solid #4a3578', fontSize: 13 }} />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Search curated KYC-verified AI agents..." style={{ flex: 1, padding: '10px 12px', borderRadius: 10, background: '#1a142e', color: '#fff', border: '1px solid #4a3578', fontSize: 13 }} />
             {search && <button onClick={() => setSearch('')} style={{ background: '#4a3578', color: '#fff', border: 'none', borderRadius: 10, padding: '0 12px', fontWeight: 'bold' }}>✕</button>}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 5, marginBottom: 10 }}>
@@ -257,7 +256,6 @@ export default function Home() {
               </div>
             );
           })}
-          {!search && catIdx === 0 && filtered.length > 30 && <p style={{ textAlign: 'center', color: '#888', fontSize: 12 }}>Showing top 30 agents. Search or pick a category to explore all <b>{agents.length}</b> agents.</p>}
         </div>
       )}
       {bot && (
@@ -297,4 +295,5 @@ export default function Home() {
       </footer>
     </div>
   );
-}
+        }
+                                        
