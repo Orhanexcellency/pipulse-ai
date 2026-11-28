@@ -1,6 +1,6 @@
 export const metadata = {
-  title: 'PiPulse AI - Decentralized AI Marketplace & P2P Smart Trade',
-  description: 'KYC-Verified AI Agents, x402/Pi SDK Micropayments, and P2P Smart Trade Contracts on Pi Network.',
+  title: 'PulseAI - Decentralized AI Marketplace & P2P Smart Trade',
+  description: 'KYC-Verified AI Agents, Pi SDK Micropayments, and P2P Smart Trade Contracts on Pi Network.',
 };
 
 export default function RootLayout({ children }) {
