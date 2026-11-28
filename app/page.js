@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 
 const BOTS = [
-  { id: '1', creator_uid: 'guide', creator_username: 'PiPulseOfficial', name: '🧭 AI Concierge: Find Your Best Bot!', description: 'Not sure which agent to pick? Tell me your goal, and I will match you with the exact expert and prompt.', system_prompt: 'You are the PiPulse AI Concierge. Recommend the best bot category and prompt for the user goal.', price_per_msg: 0.22 }
+  { id: '1', creator_uid: 'guide', creator_username: 'PulseAI_Official', name: '🧭 AI Concierge: Find Your Best Bot!', description: 'Not sure which agent to pick? Tell me your goal, and I will match you with the exact expert and prompt.', system_prompt: 'You are the PulseAI Concierge. Recommend the best bot category and prompt for the user goal.', price_per_msg: 0.22 }
 ];
 const LANGS = [['🇬🇧 EN','English'],['🇹🇷 TR','Turkish'],['🇨🇳 ZH','Chinese'],['🇪🇸 ES','Spanish'],['🇮🇳 HI','Hindi'],['🇻🇳 VI','Vietnamese'],['🇰🇷 KO','Korean'],['🇸🇦 AR','Arabic'],['🇮🇩 ID','Indonesian'],['🇷🇺 RU','Russian']];
 const CATS = [
@@ -83,7 +83,7 @@ export default function Home() {
     const buyer = trade.role === 'Buying' ? `@${user.username}` : trade.partner;
     const seller = trade.role === 'Selling' ? `@${user.username}` : trade.partner;
     try {
-      const res = await fetch('/api/payments/approve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: `Buyer (Pays Pi): ${buyer}, Seller (Delivers): ${seller}, Item/Service: ${trade.item}, Agreed Price: ${trade.amount} Pi`, systemPrompt: 'You are the PiPulse P2P Smart Trade & Contract AI. Draft a concise, clear Pi Network peer-to-peer trade agreement clearly stating Buyer and Seller obligations, KYC status, delivery terms, and mutual confirmation clauses.' }) });
+      const res = await fetch('/api/payments/approve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: `Buyer (Pays Pi): ${buyer}, Seller (Delivers): ${seller}, Item/Service: ${trade.item}, Agreed Price: ${trade.amount} Pi`, systemPrompt: 'You are the PulseAI P2P Smart Trade & Contract AI. Draft a concise, clear Pi Network peer-to-peer trade agreement clearly stating Buyer and Seller obligations, KYC status, delivery terms, and mutual confirmation clauses.' }) });
       const data = await res.json();
       setContract(data.reply || 'Smart trade contract generated.');
       setRecentTrades(prev => [{ pair: `${buyer} ↔ ${seller}`, item: trade.item, amt: `${trade.amount} Pi`, status: 'Awaiting Partner Confirmation' }, ...prev]);
@@ -133,10 +133,10 @@ export default function Home() {
     return (!search || text.toLowerCase().includes(search.toLowerCase())) && (!activeRegex || activeRegex.test(text));
   });
   const visibleBots = (search || activeRegex) ? filtered.slice(0, 60) : filtered.slice(0, 30);
-  return (
+    return (
     <div style={{ maxWidth: 500, margin: '0 auto', padding: 14 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #333', paddingBottom: 10 }}>
-        <b onClick={() => { setBot(null); setTab('market'); }} style={{ color: '#f5b041', fontSize: 18 }}>⚡ PiPulse AI</b>
+        <b onClick={() => { setBot(null); setTab('market'); }} style={{ color: '#f5b041', fontSize: 18 }}>⚡ PulseAI</b>
         {user ? <span style={{ background: '#134e4a', color: '#5eead4', padding: '5px 10px', borderRadius: 14, fontSize: 11, fontWeight: 'bold' }}>🛡️ @{user.username} • KYC</span> : <button onClick={login} style={{ background: '#f5b041', padding: '8px 14px', borderRadius: 8, border: 'none', fontWeight: 'bold' }}>Sign in with Pi</button>}
       </div>
       <div style={{ display: 'flex', gap: 5, margin: '12px 0' }}>
@@ -209,7 +209,7 @@ export default function Home() {
           {txs.map((x, i) => <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid #2a214a', fontSize: 13 }}><span>{x.t}</span><b style={{ color: x.c }}>{x.a}</b></div>)}
         </div>
       )}
-                {tab === 'create' && user && (
+              {tab === 'create' && user && (
         <form onSubmit={create} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ background: '#134e4a', color: '#5eead4', padding: 8, borderRadius: 8, fontSize: 12 }}>🛡️ Publishing with Pi KYC Identity Protection (Max 3 bots/user)</div>
           <input placeholder="Agent Name" value={form.name} onChange={e => setForm({...form, name: e.target.value})} required style={{ padding: 11, borderRadius: 8 }} />
@@ -293,5 +293,5 @@ export default function Home() {
       </footer>
     </div>
   );
-      }
-                  
+              }
+              
