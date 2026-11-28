@@ -2,25 +2,29 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 
+const FENCE = String.fromCharCode(96).repeat(3);
+const TICK = String.fromCharCode(96);
+
 const BOTS = [
   { id: '1', creator_uid: 'guide', creator_username: 'PulseAI_Official', name: '🧭 AI Concierge: Find Your Best Agent', description: 'Tell me your goal and I will match you with the right specialist among our 25 curated agents.', system_prompt: 'You are the PulseAI Concierge. Recommend the best bot category and prompt for the user goal.', price_per_msg: 0.22 }
 ];
 const LANGS = [['🇬🇧 EN','English'],['🇹🇷 TR','Turkish'],['🇨🇳 ZH','Chinese'],['🇪🇸 ES','Spanish'],['🇮🇳 HI','Hindi'],['🇻🇳 VI','Vietnamese'],['🇰🇷 KO','Korean'],['🇸🇦 AR','Arabic'],['🇮🇩 ID','Indonesian'],['🇷🇺 RU','Russian']];
 const CATS = [
-  ['All', null],
-  ['Pi & Web3', /\b(pi|web3|blockchain|defi|nft|solidity|tokenomics|crypto|smart contract|escrow)\b/i],
-  ['Software & AI', /\b(code|sql|python|react|next\.js|software|developer|bug|cloud|devops|app|aso|database|supabase|prompt|automation)\b/i],
-  ['Business & Finance', /\b(finance|sales|trade|lawyer|pitch|startup|vc|tax|budget|real estate|b2b|contract|supply chain|customs)\b/i],
-  ['Marketing & SEO', /\b(seo|viral|content|copywriter|social|ads|brand|shorts|reels|tiktok|instagram|linkedin|newsletter)\b/i],
-  ['Life & Education', /\b(nutrition|fitness|travel|language|tutor|chef|coach|sleep|yoga|running|parenting|pet|ielts|math)\b/i]
+  ['All', []],
+  ['Pi & Web3', ['pi', 'web3', 'blockchain', 'defi', 'nft', 'solidity', 'tokenomics', 'crypto', 'smart contract', 'escrow']],
+  ['Software & AI', ['code', 'sql', 'python', 'react', 'next.js', 'software', 'developer', 'bug', 'cloud', 'devops', 'app', 'aso', 'database', 'supabase', 'prompt', 'automation']],
+  ['Business & Finance', ['finance', 'sales', 'trade', 'lawyer', 'pitch', 'startup', 'vc', 'tax', 'budget', 'real estate', 'b2b', 'contract', 'supply chain', 'customs']],
+  ['Marketing & SEO', ['seo', 'viral', 'content', 'copywriter', 'social', 'ads', 'brand', 'shorts', 'reels', 'tiktok', 'instagram', 'linkedin', 'newsletter']],
+  ['Life & Education', ['nutrition', 'fitness', 'travel', 'language', 'tutor', 'chef', 'coach', 'sleep', 'yoga', 'running', 'parenting', 'pet', 'ielts', 'math']]
 ];
 
 function FormatInline({ text }) {
-  return text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g).map((part, i) => {
-    if (part.startsWith('**') && part.endsWith('**')) return <b key={i} style={{ color: '#fde68a' }}>{part.slice(2, -2)}</b>;
-    if (part.startsWith('*') && part.endsWith('*') && part.length > 2) return <em key={i} style={{ color: '#cbd5e1', fontStyle: 'italic' }}>{part.slice(1, -1)}</em>;
-    if (part.startsWith('`') && part.endsWith('`')) return <code key={i} style={{ background: '#0f0c29', color: '#5eead4', padding: '1px 5px', borderRadius: 4, fontSize: 12 }}>{part.slice(1, -1)}</code>;
-    return <span key={i}>{part}</span>;
+  return text.split('**').map((seg, i) => {
+    if (i % 2 === 1) return <b key={i} style={{ color: '#fde68a' }}>{seg}</b>;
+    return seg.split(TICK).map((sub, j) => {
+      if (j % 2 === 1) return <code key={j} style={{ background: '#0f0c29', color: '#5eead4', padding: '1px 5px', borderRadius: 4, fontSize: 12 }}>{sub}</code>;
+      return sub.split('*').map((it, k) => (k % 2 === 1 && it.trim() ? <em key={k} style={{ color: '#cbd5e1', fontStyle: 'italic' }}>{it}</em> : <span key={k}>{it}</span>));
+    });
   });
 }
 
@@ -37,15 +41,13 @@ function FormattedLines({ text }) {
 }
 
 function FormattedReply({ text }) {
-  const blocks = text.split(/(```[\s\(\S\)]*?```)/g);
   return (
     <div style={{ lineHeight: 1.55 }}>
-      {blocks.map((blk, i) => {
-        if (blk.startsWith('```') && blk.endsWith('```')) {
-          const lines = blk.slice(3, -3).split('\n');
-          const first = (lines[0] || '').trim();
-          const lang = first.match(/^[a-zA-Z0-9_-]+$/) ? lines.shift().trim() : 'code';
-          const code = lines.join('\n').trim();
+      {text.split(FENCE).map((blk, i) => {
+        if (i % 2 === 1) {
+          const lines = blk.split('\n');
+          const lang = (lines[0] || '').trim() || 'code';
+          const code = lines.slice(1).join('\n').trim() || blk.trim();
           return (
             <div key={i} style={{ background: '#090717', border: '1px solid #4a3578', borderRadius: 8, margin: '8px 0', overflow: 'hidden' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#171130', padding: '4px 8px', fontSize: 10, color: '#a5f3fc' }}>
@@ -172,15 +174,15 @@ export default function Home() {
 
   const delBot = async (e, id) => { e.stopPropagation(); if (confirm('Delete this agent?')) { await supabase.from('ai_agents').delete().eq('id', id); getBots(); } };
   const refUrl = 'https://pulseai7781' + '.vercel.app/?ref=' + (user?.username || 'Pioneer');
-  const activeRegex = CATS[catIdx][1];
+  const activeKeys = CATS[catIdx][1];
   const sorted = [...agents].sort((a, b) => (a.creator_uid === 'guide' ? -1 : b.creator_uid === 'guide' ? 1 : a.creator_uid === 'featured' ? -1 : b.creator_uid === 'featured' ? 1 : 0));
   const filtered = sorted.filter(b => {
-    if (activeRegex && b.creator_uid === 'guide') return false;
-    const text = b.name + ' ' + b.description;
-    return (!search || text.toLowerCase().includes(search.toLowerCase())) && (!activeRegex || activeRegex.test(text));
+    if (activeKeys.length > 0 && b.creator_uid === 'guide') return false;
+    const text = (b.name + ' ' + b.description).toLowerCase();
+    return (!search || text.includes(search.toLowerCase())) && (activeKeys.length === 0 || activeKeys.some(k => text.includes(k)));
   });
   const visibleBots = filtered.slice(0, 50);
-              return (
+  return (
     <div style={{ maxWidth: 500, margin: '0 auto', padding: 14 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #333', paddingBottom: 10 }}>
         <b onClick={() => { setBot(null); setTab('market'); }} style={{ color: '#f5b041', fontSize: 18 }}>⚡ PulseAI</b>
@@ -249,7 +251,7 @@ export default function Home() {
           </div>
         </div>
       )}
-      {tab === 'wallet' && user && (
+                                                                             {tab === 'wallet' && user && (
         <div style={{ background: '#1a142e', padding: 14, borderRadius: 12, border: '1px solid #4a3578' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#0f0c29', padding: 12, borderRadius: 10, marginBottom: 12 }}>
             <div><small style={{ color: '#999' }}>Testnet Demo Balance</small><div style={{ fontSize: 20, fontWeight: 'bold', color: '#4ade80' }}>{bal.toFixed(2)} Pi</div></div>
@@ -278,7 +280,7 @@ export default function Home() {
           <button type="submit" disabled={busy} style={{ background: '#f5b041', padding: 13, borderRadius: 8, fontWeight: 'bold', border: 'none' }}>{busy ? 'Publishing...' : 'Publish KYC-Verified Agent'}</button>
         </form>
       )}
-      {tab === 'market' && !bot && (
+                    {tab === 'market' && !bot && (
         <div>
           <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Search curated KYC-verified AI agents..." style={{ flex: 1, padding: '10px 12px', borderRadius: 10, background: '#1a142e', color: '#fff', border: '1px solid #4a3578', fontSize: 13 }} />
@@ -310,7 +312,7 @@ export default function Home() {
           })}
         </div>
       )}
-      {bot && (
+                            {bot && (
         <div style={{ background: '#1a142e', padding: 12, borderRadius: 12, border: '1px solid #4a3578' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, flex: 1 }}>
@@ -349,4 +351,16 @@ export default function Home() {
             ))}
             {busy && <small style={{ color: '#f5b041' }}>AI is analyzing...</small>}
           </div>
-                   
+          <div style={{ display: 'flex', gap: 6 }}><input value={txt} onChange={e => setTxt(e.target.value)} placeholder="Ask your question..." style={{ flex: 1, padding: 10, borderRadius: 8 }} /><button onClick={() => send()} disabled={busy} style={{ background: '#f5b041', padding: '10px 16px', borderRadius: 8, fontWeight: 'bold', border: 'none' }}>Send</button></div>
+        </div>
+      )}
+      <footer style={{ marginTop: 20, paddingTop: 12, borderTop: '1px solid #2a214a', textAlign: 'center', fontSize: 11, color: '#888', lineHeight: 1.5 }}>
+        <div style={{ marginBottom: 4 }}>
+          <a href="/privacy" style={{ color: '#f5b041', textDecoration: 'none', marginRight: 10 }}>Privacy Policy</a> •
+          <a href="/terms" style={{ color: '#f5b041', textDecoration: 'none', marginLeft: 10 }}>Terms of Service</a>
+        </div>
+        <div>SSL Secured • Non-Custodial Testnet dApp • Independent Pi Ecosystem App</div>
+      </footer>
+    </div>
+  );
+              }
