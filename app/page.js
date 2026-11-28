@@ -15,6 +15,39 @@ const CATS = [
   ['Life & Education', /\b(nutrition|fitness|travel|language|tutor|chef|coach|sleep|yoga|running|parenting|pet|ielts|math)\b/i]
 ];
 
+function FormatInline({ text }) {
+  return text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**')) return <b key={i} style={{ color: '#fde68a' }}>{part.slice(2, -2)}</b>;
+    if (part.startsWith('`') && part.endsWith('`')) return <code key={i} style={{ background: '#0f0c29', color: '#5eead4', padding: '1px 5px', borderRadius: 4, fontSize: 12 }}>{part.slice(1, -1)}</code>;
+    return <span key={i}>{part}</span>;
+  });
+}
+
+function FormattedReply({ text }) {
+  const blocks = text.split(/(```[\s\(\S\)]*?```)/g);
+  return (
+    <div style={{ lineHeight: 1.55 }}>
+      {blocks.map((blk, i) => {
+        if (blk.startsWith('```') && blk.endsWith('```')) {
+          const lines = blk.slice(3, -3).split('\n');
+          const first = (lines[0] || '').trim();
+          const lang = first.match(/^[a-zA-Z0-9_-]+$/) ? lines.shift().trim() : 'code';
+          const code = lines.join('\n').trim();
+          return (
+            <div key={i} style={{ background: '#090717', border: '1px solid #4a3578', borderRadius: 8, margin: '8px 0', overflow: 'hidden' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#171130', padding: '4px 8px', fontSize: 10, color: '#a5f3fc' }}>
+                <span>{lang.toUpperCase()}</span>
+                <button type="button" onClick={() => { navigator.clipboard?.writeText(code); alert('Code copied!'); }} style={{ background: '#0d9488', color: '#fff', border: 'none', borderRadius: 4, padding: '2px 6px', fontSize: 10, fontWeight: 'bold' }}>Copy Code</button>
+              </div>
+              <pre style={{ margin: 0, padding: '8px 10px', overflowX: 'auto', fontSize: 12, color: '#6ee7b7', fontFamily: 'monospace' }}><code>{code}</code></pre>
+            </div>
+          );
+        }
+        return <div key={i} style={{ whiteSpace: 'pre-wrap' }}><FormatInline text={blk} /></div>;
+      })}
+    </div>
+  );
+      }
 export default function Home() {
   const [user, setUser] = useState(null), [agents, setAgents] = useState(BOTS), [bot, setBot] = useState(null);
   const [msgs, setMsgs] = useState([]), [txt, setTxt] = useState(''), [search, setSearch] = useState(''), [catIdx, setCatIdx] = useState(0);
@@ -39,12 +72,8 @@ export default function Home() {
   };
 
   const requireAuth = (nextTab) => {
-    if (!user) {
-      if (confirm('Please sign in with Pi Wallet first to access this feature. Sign in now?')) login();
-      return;
-    }
-    setBot(null);
-    setTab(nextTab);
+    if (!user) { if (confirm('Please sign in with Pi Wallet first to access this feature. Sign in now?')) login(); return; }
+    setBot(null); setTab(nextTab);
   };
 
   useEffect(() => {
@@ -71,7 +100,7 @@ export default function Home() {
       setBal(Math.max(0, Number((activeBal - p).toFixed(2))));
       setChatCounts(prev => ({ ...prev, [bot.id]: (prev[bot.id] || 0) + 1 }));
       setTxs(prev => [{ t: `Pi SDK Payment: ${bot.name}`, a: `-${p.toFixed(2)} Pi`, c: '#f87171' }, ...prev]);
-      setMsgs(prev => [...prev, { r: 'u', t: q }, { r: 'a', t: `[Pi SDK Paid: ${p.toFixed(2)} Pi] ` + (data.reply || 'Response ready.') }]);
+      setMsgs(prev => [...prev, { r: 'u', t: q }, { r: 'a', paid: p.toFixed(2), t: data.reply || 'Response ready.' }]);
     } catch (e) { setMsgs(prev => [...prev, { r: 'u', t: q }, { r: 'a', t: '⚠️ Error: ' + e.message }]); }
     setBusy(false);
   };
@@ -99,7 +128,7 @@ export default function Home() {
   const trMsg = async (idx, raw, lang) => {
     setTrIdx(idx); setMsgs(p => p.map((m, i) => i === idx ? { ...m, tr: `⏳ Translating to ${lang}...` } : m));
     try {
-      const res = await fetch('/api/payments/approve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: raw.replace(/^\[.*?Paid.*?\]\s*/, ''), systemPrompt: `Translate into ${lang}. Return ONLY translation.` }) });
+      const res = await fetch('/api/payments/approve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: raw, systemPrompt: `Translate into ${lang}. Return ONLY translation.` }) });
       const data = await res.json();
       setMsgs(p => p.map((m, i) => i === idx ? { ...m, tr: `[🌐 ${lang}]: ${data.reply || 'Please try again.'}` } : m));
     } catch (e) {} setTrIdx(null);
@@ -124,7 +153,7 @@ export default function Home() {
   };
 
   const delBot = async (e, id) => { e.stopPropagation(); if (confirm('Delete this agent?')) { await supabase.from('ai_agents').delete().eq('id', id); getBots(); } };
-  const refUrl = 'https://pipulseai' + '.vercel.app/?ref=' + (user?.username || 'Pioneer');
+  const refUrl = 'https://pulseai7781' + '.vercel.app/?ref=' + (user?.username || 'Pioneer');
   const activeRegex = CATS[catIdx][1];
   const sorted = [...agents].sort((a, b) => (a.creator_uid === 'guide' ? -1 : b.creator_uid === 'guide' ? 1 : a.creator_uid === 'featured' ? -1 : b.creator_uid === 'featured' ? 1 : 0));
   const filtered = sorted.filter(b => {
@@ -133,7 +162,7 @@ export default function Home() {
     return (!search || text.toLowerCase().includes(search.toLowerCase())) && (!activeRegex || activeRegex.test(text));
   });
   const visibleBots = filtered.slice(0, 50);
-  return (
+                                                  return (
     <div style={{ maxWidth: 500, margin: '0 auto', padding: 14 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #333', paddingBottom: 10 }}>
         <b onClick={() => { setBot(null); setTab('market'); }} style={{ color: '#f5b041', fontSize: 18 }}>⚡ PulseAI</b>
@@ -168,7 +197,7 @@ export default function Home() {
             {contract && (
               <div style={{ marginTop: 12, background: '#0f0c29', padding: 12, borderRadius: 8, border: '1px solid #4a3578' }}>
                 <div style={{ fontSize: 11, color: '#5eead4', marginBottom: 6, fontWeight: 'bold' }}>🔐 Agreement Proof ID: #PA-{Date.now().toString().slice(-6)}</div>
-                <div style={{ fontSize: 12, whiteSpace: 'pre-wrap', color: '#e2e8f0' }}>{contract}</div>
+                <FormattedReply text={contract} />
                 <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
                   <button onClick={() => { navigator.clipboard?.writeText(contract); alert('Agreement & Proof ID copied for Pi Chats!'); }} style={{ flex: 1, background: '#f5b041', padding: '8px', borderRadius: 6, border: 'none', fontWeight: 'bold', fontSize: 11 }}>📋 Copy for Pi Chats</button>
                   <button onClick={sealContract} style={{ flex: 1, background: '#4ade80', color: '#000', padding: '8px', borderRadius: 6, border: 'none', fontWeight: 'bold', fontSize: 11 }}>🛡️ Record Pi SDK Timestamp</button>
@@ -212,7 +241,7 @@ export default function Home() {
           {txs.map((x, i) => <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid #2a214a', fontSize: 13 }}><span>{x.t}</span><b style={{ color: x.c }}>{x.a}</b></div>)}
         </div>
       )}
-                {tab === 'create' && user && (
+                            {tab === 'create' && user && (
         <form onSubmit={create} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ background: '#134e4a', color: '#5eead4', padding: 8, borderRadius: 8, fontSize: 12 }}>🛡️ Publishing with Pi KYC Identity Protection (Max 3 bots/user)</div>
           <input placeholder="Agent Name" value={form.name} onChange={e => setForm({...form, name: e.target.value})} required style={{ padding: 11, borderRadius: 8 }} />
@@ -260,7 +289,13 @@ export default function Home() {
       )}
       {bot && (
         <div style={{ background: '#1a142e', padding: 12, borderRadius: 12, border: '1px solid #4a3578' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}><b>{bot.name} <small style={{ color: '#4ade80' }}>● Memory</small></b><button onClick={() => setBot(null)} style={{ color: '#f5b041', background: 'none', border: 'none' }}>← Back</button></div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, flex: 1 }}>
+              <b style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 14 }}>{bot.name}</b>
+              <small style={{ color: '#4ade80', flexShrink: 0, fontSize: 11 }}>● Memory</small>
+            </div>
+            <button onClick={() => setBot(null)} style={{ color: '#f5b041', background: '#2e1a47', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 12, fontWeight: 'bold', flexShrink: 0 }}>← Back</button>
+          </div>
           <div style={{ height: '52vh', minHeight: 340, overflowY: 'auto', background: '#0f0c29', padding: 10, borderRadius: 10, marginBottom: 10 }}>
             {msgs.length === 0 && (
               <div style={{ textAlign: 'center', marginTop: 30 }}>
@@ -271,11 +306,19 @@ export default function Home() {
               </div>
             )}
             {msgs.map((m, i) => (
-              <div key={i} style={{ textAlign: m.r === 'u' ? 'right' : 'left', margin: '8px 0' }}>
-                <div style={{ background: m.r === 'u' ? '#5b2c6f' : '#261e45', padding: '8px 12px', borderRadius: 10, display: 'inline-block', fontSize: 14, whiteSpace: 'pre-wrap' }}>{m.t}{m.tr && <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid #4a3578', color: '#a5f3fc', fontSize: 13 }}>{m.tr}</div>}</div>
+              <div key={i} style={{ textAlign: m.r === 'u' ? 'right' : 'left', margin: '10px 0' }}>
+                {m.r === 'a' && m.paid && (
+                  <div style={{ display: 'inline-block', background: '#134e4a', color: '#5eead4', border: '1px solid #2dd4bf', padding: '2px 8px', borderRadius: 10, fontSize: 10, fontWeight: 'bold', marginBottom: 4 }}>
+                    ✓ {m.paid} Pi Paid via Pi SDK
+                  </div>
+                )}
+                <div style={{ background: m.r === 'u' ? '#5b2c6f' : '#261e45', padding: '10px 12px', borderRadius: 10, display: m.r === 'u' ? 'inline-block' : 'block', fontSize: 13 }}>
+                  {m.r === 'a' ? <FormattedReply text={m.t} /> : m.t}
+                  {m.tr && <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #4a3578', color: '#a5f3fc', fontSize: 13 }}><FormattedReply text={m.tr} /></div>}
+                </div>
                 {m.r === 'a' && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 6 }}>
-                    <button type="button" onClick={() => { navigator.clipboard?.writeText(m.tr || m.t.replace(/^\[.*?Paid.*?\]\s*/, '')); alert('Response copied!'); }} style={{ background: '#0d9488', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 8px', fontSize: 11, fontWeight: 'bold' }}>📋 Copy</button>
+                    <button type="button" onClick={() => { navigator.clipboard?.writeText(m.tr || m.t); alert('Response copied!'); }} style={{ background: '#0d9488', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 8px', fontSize: 11, fontWeight: 'bold' }}>📋 Copy</button>
                     {LANGS.map(([l, c]) => <button type="button" key={c} onClick={() => trMsg(i, m.t, c)} disabled={trIdx === i} style={{ background: '#1e1633', color: '#f5b041', border: '1px solid #4a3578', borderRadius: 6, padding: '4px 8px', fontSize: 11 }}>{l}</button>)}
                   </div>
                 )}
@@ -295,5 +338,5 @@ export default function Home() {
       </footer>
     </div>
   );
-        }
-                                        
+              }
+        
